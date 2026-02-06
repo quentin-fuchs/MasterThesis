@@ -268,3 +268,236 @@ def view_inference_results(ligand_sdf=None, receptor_pdb=None, results_dir=None,
         viewer.zoomTo()
 
     return viewer
+
+
+def view_diffusion_animation(reverse_pdb=None, receptor_pdb=None, results_dir=None,
+                             rank=1, width=800, height=600,
+                             loop="forward", interval=200,
+                             ligand_colour='#e6194b', receptor_style=None, show_surface=False,
+                             surface_opacity=0.15):
+    """Animate the reverse diffusion trajectory for a ranked pose.
+
+    Parameters
+    ----------
+    reverse_pdb : str, optional
+        Path to a ``rank*_reverseprocess.pdb``.
+    receptor_pdb : str, optional
+        Path to a receptor PDB.
+    results_dir : str, optional
+        DiffDock output directory; auto-discovers files via metadata.
+    rank : int
+        1-based rank to animate (used with *results_dir*).
+    width, height : int
+        Canvas size in pixels.
+    loop : str
+        ``"forward"``, ``"backward"``, or ``"backAndForth"``.
+    interval : int
+        Milliseconds between frames.
+    ligand_colour : str
+        Colour for the ligand.
+    receptor_style : dict, optional
+        py3Dmol style dict for the receptor.
+    show_surface : bool
+        If True, add a translucent molecular surface around the receptor.
+    surface_opacity : float
+        Opacity of the receptor surface (only used when show_surface=True).
+    Returns
+    -------
+    py3Dmol.view
+    """
+    try:
+        import py3Dmol
+    except ImportError as exc:
+        raise ImportError("py3Dmol is required; install with `pip install py3Dmol`.") from exc
+
+    # ---- Resolve paths via results_dir if given ----------------------------
+    if results_dir is not None:
+        info = load_results_dir(results_dir)
+        receptor_pdb = receptor_pdb or info["receptor_pdb"]
+        reverse_pdb = os.path.join(os.path.abspath(results_dir),
+                                   f"rank{rank}_reverseprocess.pdb")
+        if not os.path.isfile(reverse_pdb):
+            raise FileNotFoundError(
+                f"{reverse_pdb} not found. Run inference with --save_visualisation.")
+    elif reverse_pdb is None:
+        raise ValueError("Provide either 'reverse_pdb' or 'results_dir'.")
+
+    with open(reverse_pdb, 'r', encoding='utf-8') as f:
+        pdb_text = f.read()
+
+    viewer = py3Dmol.view(width=width, height=height)
+    viewer.setBackgroundColor('white')
+
+    # ---- Static receptor ---------------------------------------------------
+    receptor_model_count = 0
+    if receptor_pdb is not None:
+        with open(receptor_pdb, 'r', encoding='utf-8') as fh:
+            viewer.addModel(fh.read(), 'pdb')
+        receptor_model_count = 1
+        viewer.setStyle({'model': 0},
+                        receptor_style or {'cartoon': {'color': 'spectrum',
+                                                       'opacity': 0.85}})
+        if show_surface:
+            viewer.addSurface(py3Dmol.VDW, {'opacity': surface_opacity, 'color': 'white'}, {'model': 0})
+
+    # ---- Animated ligand frames --------------------------------------------
+    viewer.addModelsAsFrames(pdb_text)
+    viewer.setStyle({'model': receptor_model_count},
+                    {'stick': {'radius': 0.2, 'color': ligand_colour},
+                     'sphere': {'radius': 0.4, 'color': ligand_colour,
+                                'opacity': 0.6}})
+
+    viewer.zoomTo({'model': receptor_model_count})
+    viewer.animate({'loop': loop, 'interval': interval})
+
+    return viewer
+
+
+def _split_pdb_models(pdb_text):
+    """Split a multi-model PDB string into a list of individual MODEL blocks."""
+    models = []
+    current = []
+    for line in pdb_text.splitlines(True):
+        current.append(line)
+        if line.startswith("ENDMDL"):
+            models.append("".join(current))
+            current = []
+    return models
+
+
+def plot_diffusion_frames(reverse_pdb=None, receptor_pdb=None, results_dir=None,
+                          rank=1, n_frames=10, step=None,
+                          cell_width=280, cell_height=280,
+                          ligand_colour='#e6194b', receptor_style=None,
+                          ncols=5, show_surface=False, surface_opacity=0.15):
+    """Show selected reverse-diffusion frames as a py3Dmol viewer grid.
+
+    Each sub-panel shows the receptor (static) and one ligand frame, all
+    sharing the same camera so they are directly comparable.
+
+    Parameters
+    ----------
+    reverse_pdb : str, optional
+        Path to a ``rank*_reverseprocess.pdb``.
+    receptor_pdb : str, optional
+        Path to a receptor PDB.
+    results_dir : str, optional
+        DiffDock output directory (auto-discovers files).
+    rank : int
+        1-based rank (used with *results_dir*).
+    n_frames : int
+        Maximum number of frames to display.
+    step : int, optional
+        Pick every *step*-th frame.  If None, computed automatically to
+        spread *n_frames* evenly across all available frames.
+    cell_width, cell_height : int
+        Size of each sub-panel in pixels.
+    ligand_colour : str
+        Colour for the ligand.
+    receptor_style : dict, optional
+        py3Dmol style for the receptor.
+    ncols : int
+        Number of columns in the grid.
+    show_surface : bool
+        If True, add a translucent molecular surface around the receptor.
+    surface_opacity : float
+        Opacity of the receptor surface (only used when show_surface=True).
+
+    Returns
+    -------
+    py3Dmol.view
+    """
+    try:
+        import py3Dmol
+    except ImportError as exc:
+        raise ImportError("py3Dmol is required; install with `pip install py3Dmol`.") from exc
+
+    # ---- Resolve paths -----------------------------------------------------
+    if results_dir is not None:
+        info = load_results_dir(results_dir)
+        receptor_pdb = receptor_pdb or info["receptor_pdb"]
+        reverse_pdb = os.path.join(os.path.abspath(results_dir),
+                                   f"rank{rank}_reverseprocess.pdb")
+        if not os.path.isfile(reverse_pdb):
+            raise FileNotFoundError(
+                f"{reverse_pdb} not found. Run inference with --save_visualisation.")
+    elif reverse_pdb is None:
+        raise ValueError("Provide either 'reverse_pdb' or 'results_dir'.")
+
+    with open(reverse_pdb, 'r', encoding='utf-8') as f:
+        pdb_text = f.read()
+
+    models = _split_pdb_models(pdb_text)
+    n_total = len(models)
+
+    # ---- Select frames -----------------------------------------------------
+    if step is None:
+        step = max(1, n_total // n_frames)
+    indices = list(range(0, n_total, step))[:n_frames]
+
+    # ---- Read receptor once ------------------------------------------------
+    rec_text = None
+    if receptor_pdb is not None:
+        with open(receptor_pdb, 'r', encoding='utf-8') as fh:
+            rec_text = fh.read()
+
+    # ---- Build viewer grid -------------------------------------------------
+    n = len(indices)
+    nrows = (n + ncols - 1) // ncols
+    total_width = cell_width * ncols
+    total_height = cell_height * nrows
+
+    viewer = py3Dmol.view(width=total_width, height=total_height,
+                          viewergrid=(nrows, ncols), linked=True)
+    viewer.setBackgroundColor('white')
+    
+    rec_style = receptor_style or {'cartoon': {'color': 'spectrum', 'opacity': 0.85}}
+    lig_style = {'stick': {'radius': 0.2, 'color': ligand_colour},
+                 'sphere': {'radius': 0.4, 'color': ligand_colour, 'opacity': 0.6}}
+
+    labels = []
+    for plot_i, frame_i in enumerate(indices):
+        r = plot_i // ncols
+        c = plot_i % ncols
+        pos = (r, c)
+
+        # Receptor
+        model_offset = 0
+        if rec_text is not None:
+            viewer.addModel(rec_text, 'pdb', viewer=pos)
+            if show_surface:
+                viewer.addSurface(py3Dmol.VDW, {'opacity': surface_opacity, 'color': 'white'}, {'model': -1}, viewer=pos)
+            viewer.setStyle({'model': 0}, rec_style, viewer=pos)
+            model_offset = 1
+
+        # Single ligand frame
+        viewer.addModel(models[frame_i], 'pdb', viewer=pos)
+        viewer.setStyle({'model': model_offset}, lig_style, viewer=pos)
+
+        viewer.zoomTo({'model': model_offset}, viewer=pos)
+
+        # Label
+        label = "Original" if frame_i == 0 else f"Step {frame_i}"
+        labels.append((pos, label))
+
+    # Add labels after all models so they render on top
+    for pos, label in labels:
+        viewer.addLabel(label, {
+            'position': {'x': 0, 'y': 0, 'z': 0},
+            'backgroundColor': 'white',
+            'backgroundOpacity': 0.7,
+            'fontColor': 'black',
+            'fontSize': 11,
+            'inFront': True,
+            'showBackground': True,
+            'screenOffset': {'x': -cell_width // 2 + 10, 'y': cell_height // 2 - 15},
+            'useScreen': True,
+        }, viewer=pos)
+
+    # Blank out unused grid cells
+    for plot_i in range(n, nrows * ncols):
+        r = plot_i // ncols
+        c = plot_i % ncols
+        viewer.setBackgroundColor('#f5f5f5', viewer=(r, c))
+
+    return viewer
