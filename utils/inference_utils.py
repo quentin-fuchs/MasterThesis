@@ -1,4 +1,7 @@
+import datetime
+import json
 import os
+import shutil
 from esm import FastaBatchedDataset, pretrained
 from rdkit.Chem import AddHs, MolFromSmiles
 from torch_geometric.data import Dataset, HeteroData
@@ -9,6 +12,65 @@ import esm
 
 from datasets.process_mols import generate_conformer, read_molecule, get_lig_graph_with_matching, moad_extract_receptor_structure
 from datasets.parse_chi import aa_idx2aa_short, get_onehot_sequence
+
+
+def save_run_metadata(write_dir, complex_name, protein_path=None, ligand_description=None,
+                      protein_sequence=None, args=None, copy_protein=True):
+    """Save input metadata (molecule name, file paths, run parameters) to the output directory.
+
+    Also optionally copies the input protein PDB into the output directory so that
+    results are self-contained (matching the webapp behaviour).
+
+    Parameters
+    ----------
+    write_dir : str
+        Output directory for this complex (e.g. ``results/run/complex_0``).
+    complex_name : str
+        Name identifier for the complex.
+    protein_path : str, optional
+        Path to the input protein PDB file.
+    ligand_description : str, optional
+        Path to the ligand SDF/mol2 or a SMILES string.
+    protein_sequence : str, optional
+        Protein sequence (used when no PDB file is provided).
+    args : argparse.Namespace, optional
+        Full argument namespace — selected run parameters are saved.
+    copy_protein : bool
+        If True and *protein_path* points to an existing file, copy it into *write_dir*.
+    """
+    os.makedirs(write_dir, exist_ok=True)
+
+    metadata = {
+        "complex_name": complex_name,
+        "protein_path": os.path.abspath(protein_path) if protein_path else None,
+        "ligand_description": ligand_description,
+        "protein_sequence": protein_sequence,
+        "timestamp": datetime.datetime.now().isoformat(),
+    }
+
+    if args is not None:
+        metadata["run_parameters"] = {
+            "samples_per_complex": getattr(args, "samples_per_complex", None),
+            "inference_steps": getattr(args, "inference_steps", None),
+            "actual_steps": getattr(args, "actual_steps", None),
+            "batch_size": getattr(args, "batch_size", None),
+            "no_final_step_noise": getattr(args, "no_final_step_noise", None),
+            "model_dir": getattr(args, "model_dir", None),
+            "confidence_model_dir": getattr(args, "confidence_model_dir", None),
+            "save_visualisation": getattr(args, "save_visualisation", None),
+        }
+
+    metadata_path = os.path.join(write_dir, "input_metadata.json")
+    with open(metadata_path, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2)
+
+    # Copy the protein PDB into the output (same as webapp behaviour)
+    if copy_protein and protein_path and os.path.isfile(protein_path):
+        dest = os.path.join(write_dir, os.path.basename(protein_path))
+        if not os.path.exists(dest):
+            shutil.copy2(protein_path, dest)
+
+    return metadata_path
 
 
 def get_sequences_from_pdbfile(file_path):

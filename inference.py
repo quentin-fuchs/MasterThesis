@@ -29,7 +29,7 @@ import utils.utils
 from datasets.process_mols import write_mol_with_coords
 from utils.download import download_and_extract
 from utils.diffusion_utils import t_to_sigma as t_to_sigma_compl, get_t_schedule
-from utils.inference_utils import InferenceDataset, set_nones
+from utils.inference_utils import InferenceDataset, set_nones, save_run_metadata
 from utils.sampling import randomize_position, sampling
 from utils.utils import get_model
 from utils.visualise import PDBFile
@@ -288,6 +288,17 @@ def main(args):
                 if score_model_args.remove_hs: mol_pred = RemoveAllHs(mol_pred)
                 if rank == 0: write_mol_with_coords(mol_pred, pos, os.path.join(write_dir, f'rank{rank+1}.sdf'))
                 write_mol_with_coords(mol_pred, pos, os.path.join(write_dir, f'rank{rank+1}_confidence{confidence[rank]:.2f}.sdf'))
+
+            # save input metadata and copy protein into output dir
+            save_run_metadata(
+                write_dir=write_dir,
+                complex_name=complex_name_list[idx],
+                protein_path=protein_path_list[idx],
+                ligand_description=ligand_description_list[idx],
+                protein_sequence=protein_sequence_list[idx] if protein_sequence_list else None,
+                args=args,
+                copy_protein=True,
+            )
 
             # save visualisation frames
             if args.save_visualisation:
