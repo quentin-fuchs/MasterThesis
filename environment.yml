@@ -42,4 +42,5 @@ dependencies:
     #New dependencies for visualization and notebooks
     - ipykernel
     - py3Dmol==2.5.4
+    - jupyterlab==4.5.7
 
