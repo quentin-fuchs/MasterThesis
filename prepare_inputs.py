@@ -162,6 +162,14 @@ def residues_to_sdf(residues: list, raw_pdb: str, dest: str) -> bool:
         return False
 
     Chem.SanitizeMol(mol, catchErrors=True)
+
+    # Keep only the largest connected fragment (handles multi-copy crystal
+    # packing and co-crystallised molecules that DiffDock cannot process)
+    frags = Chem.rdmolops.GetMolFrags(mol, asMols=True)
+    if len(frags) > 1:
+        mol = max(frags, key=lambda m: m.GetNumAtoms())
+        print(f"    → {len(frags)} fragments detected, kept largest ({mol.GetNumAtoms()} atoms)")
+
     writer = SDWriter(dest)
     writer.write(mol)
     writer.close()
