@@ -7,14 +7,16 @@ distribution is well-captured.
 
 Main entry points
 -----------------
-load_poses          -- load all ranked SDF poses from a results directory
-compute_rmsd_matrix -- all-pairs symmetry-corrected RMSD (via spyrmsd)
-cluster_poses       -- RMSD-based hierarchical clustering (2 Å cutoff)
-saturation_analysis -- diversity vs. number of samples (mode coverage)
-plot_rmsd_heatmap   -- clustered RMSD heatmap with dendrogram ordering
-torsion_rose_plots  -- circular histograms per rotatable bond
-view_poses_colored  -- py3Dmol viewer coloured by confidence or cluster
-run_full_analysis   -- convenience wrapper returning all figures + data
+load_poses              -- load all ranked SDF poses from a results directory
+compute_rmsd_matrix     -- all-pairs symmetry-corrected RMSD (via spyrmsd)
+compute_rmsd_to_crystal -- per-pose RMSD to a ground-truth crystal SDF
+plot_confidence_vs_rmsd -- scatter plot of confidence vs crystal RMSD
+cluster_poses           -- RMSD-based hierarchical clustering (2 Å cutoff)
+saturation_analysis     -- diversity vs. number of samples (mode coverage)
+plot_rmsd_heatmap       -- clustered RMSD heatmap with dendrogram ordering
+torsion_rose_plots      -- circular histograms per rotatable bond
+view_poses_colored      -- py3Dmol viewer coloured by confidence or cluster
+run_full_analysis       -- convenience wrapper returning all figures + data
 """
 
 import os
@@ -30,6 +32,7 @@ import matplotlib.colors as mcolors
 import matplotlib.cm as cm
 from scipy.spatial.distance import squareform
 from scipy.cluster.hierarchy import linkage, fcluster, leaves_list
+from scipy.stats import spearmanr
 
 from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors, rdMolTransforms
@@ -159,6 +162,130 @@ def compute_rmsd_matrix(poses: List[PoseRecord]) -> np.ndarray:
             matrix[i, j] = rmsds[k]
 
     return matrix
+
+
+# ---------------------------------------------------------------------------
+# Crystal-structure RMSD and confidence calibration
+# ---------------------------------------------------------------------------
+
+def compute_rmsd_to_crystal(
+    crystal_sdf: str,
+    poses: List[PoseRecord],
+) -> np.ndarray:
+    """Compute symmetry-corrected RMSD from each predicted pose to the crystal structure.
+
+    Useful when running inference on a benchmark molecule where the crystal
+    structure is known (e.g. from PDBBind) — lets you measure how accurate each
+    sampled pose is. Coordinates are read directly from SDF files so no
+    re-centering is needed: both the crystal SDF and the inference output SDFs
+    are in the same absolute coordinate frame.
+
+    Args:
+        crystal_sdf: Path to the ground-truth ligand SDF (e.g.
+            ``data/PDBBind_processed/6d08/6d08_ligand.sdf``).
+        poses: List of PoseRecord from ``load_poses``.
+
+    Returns:
+        Float array of shape (N,) with per-pose RMSDs in Angstroms,
+        in the same order as ``poses``.
+
+    Raises:
+        ImportError: if spyrmsd is not importable.
+        ValueError: if the crystal SDF cannot be read.
+    """
+    if not _SPYRMSD_AVAILABLE:
+        raise ImportError(
+            "spyrmsd not found. The bundled version lives in the DiffDock repo root; "
+            "ensure the project root is on sys.path."
+        )
+
+    crystal_mol = Chem.SDMolSupplier(crystal_sdf, removeHs=False)[0]
+    if crystal_mol is None:
+        raise ValueError(f"Could not read crystal SDF: {crystal_sdf}")
+
+    crystal_mol_noh = Chem.RemoveAllHs(crystal_mol)
+    crystal_coords = crystal_mol_noh.GetConformer().GetPositions()
+    atomnums = np.array([a.GetAtomicNum() for a in crystal_mol_noh.GetAtoms()])
+    adj = Chem.GetAdjacencyMatrix(crystal_mol_noh)
+
+    pose_coords = [p.coords_heavy for p in poses]
+
+    try:
+        rmsds = _spyrmsd_rmsd.symmrmsd(
+            crystal_coords,
+            pose_coords,
+            atomnums,
+            atomnums,
+            adj,
+            adj,
+        )
+    except Exception:
+        rmsds = np.array([
+            np.sqrt(np.mean(np.sum((coords - crystal_coords) ** 2, axis=1)))
+            for coords in pose_coords
+        ])
+
+    return np.asarray(rmsds)
+
+
+def plot_confidence_vs_rmsd(
+    poses: List[PoseRecord],
+    rmsds: np.ndarray,
+    ax: Optional[plt.Axes] = None,
+    rmsd_threshold: float = 2.0,
+) -> plt.Figure:
+    """Scatter plot of DiffDock confidence score vs crystal-structure RMSD.
+
+    Each point is one predicted pose. A well-calibrated confidence model should
+    show negative correlation: higher confidence should correspond to lower RMSD.
+    Spearman ρ (rank correlation) is annotated; a negative value means confidence
+    correctly ranks accurate poses higher.
+
+    Args:
+        poses: List of PoseRecord from ``load_poses``.
+        rmsds: RMSD array from ``compute_rmsd_to_crystal``.
+        ax: Optional existing matplotlib Axes.
+        rmsd_threshold: Horizontal dashed line marking the standard docking
+            success threshold (default 2.0 Å).
+
+    Returns:
+        matplotlib Figure.
+    """
+    confidences = np.array([p.confidence for p in poses])
+    rmsds = np.asarray(rmsds)
+
+    fig = None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(7, 5))
+    else:
+        fig = ax.get_figure()
+
+    sc = ax.scatter(
+        confidences, rmsds,
+        c=rmsds, cmap="RdYlGn_r",
+        vmin=rmsds.min(), vmax=rmsds.max(),
+        s=40, alpha=0.8, edgecolors="none",
+    )
+    plt.colorbar(sc, ax=ax, label="RMSD to crystal (Å)")
+    ax.axhline(
+        rmsd_threshold, color="gray", linestyle="--", linewidth=1.2,
+        label=f"{rmsd_threshold} Å threshold",
+    )
+    ax.set_xlabel("DiffDock confidence score")
+    ax.set_ylabel("RMSD to crystal structure (Å)")
+    ax.set_title("Confidence vs. crystal RMSD")
+    ax.legend(fontsize=9)
+
+    rho, pval = spearmanr(confidences, rmsds)
+    ax.annotate(
+        f"Spearman ρ = {rho:.2f}  (p = {pval:.2g})",
+        xy=(0.02, 0.96), xycoords="axes fraction",
+        fontsize=9, va="top",
+        bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.8),
+    )
+
+    fig.tight_layout()
+    return fig
 
 
 # ---------------------------------------------------------------------------
@@ -499,25 +626,33 @@ def view_poses_colored(
 def run_full_analysis(
     results_dir: str,
     cutoff: float = 2.0,
+    crystal_sdf: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Run the complete distribution analysis for one DiffDock results directory.
 
     Computes pairwise RMSD, clusters poses, and generates all diagnostic plots.
+    If a crystal SDF is provided, also computes per-pose accuracy and plots
+    confidence vs. RMSD.
 
     Args:
         results_dir: Path to a DiffDock output directory for one complex.
         cutoff: RMSD threshold (Å) for clustering. Default is 2.0 Å.
+        crystal_sdf: Optional path to the ground-truth ligand SDF. When
+            provided, ``crystal_rmsds`` and ``confidence_rmsd_fig`` are
+            included in the returned dictionary.
 
     Returns:
         Dictionary with keys:
-        - ``poses``          : List[PoseRecord]
-        - ``rmsd_matrix``    : (N, N) ndarray
-        - ``cluster_labels`` : (N,) int ndarray
-        - ``linkage_matrix`` : scipy linkage matrix
-        - ``n_clusters``     : int
-        - ``saturation_fig`` : matplotlib Figure
-        - ``heatmap_fig``    : matplotlib Figure
-        - ``torsion_fig``    : matplotlib Figure
+        - ``poses``               : List[PoseRecord]
+        - ``rmsd_matrix``         : (N, N) ndarray
+        - ``cluster_labels``      : (N,) int ndarray
+        - ``linkage_matrix``      : scipy linkage matrix
+        - ``n_clusters``          : int
+        - ``saturation_fig``      : matplotlib Figure
+        - ``heatmap_fig``         : matplotlib Figure
+        - ``torsion_fig``         : matplotlib Figure
+        - ``crystal_rmsds``       : (N,) ndarray  [only if crystal_sdf given]
+        - ``confidence_rmsd_fig`` : matplotlib Figure  [only if crystal_sdf given]
     """
     poses = load_poses(results_dir)
     rmsd_matrix = compute_rmsd_matrix(poses)
@@ -537,7 +672,7 @@ def run_full_analysis(
         )
     )
 
-    return {
+    result = {
         "poses": poses,
         "rmsd_matrix": rmsd_matrix,
         "cluster_labels": labels,
@@ -547,3 +682,17 @@ def run_full_analysis(
         "heatmap_fig": heatmap_fig,
         "torsion_fig": torsion_fig,
     }
+
+    if crystal_sdf is not None:
+        crystal_rmsds = compute_rmsd_to_crystal(crystal_sdf, poses)
+        confidence_rmsd_fig = plot_confidence_vs_rmsd(poses, crystal_rmsds)
+        n_success = int((crystal_rmsds < cutoff).sum())
+        print(
+            f"Crystal RMSD: min={crystal_rmsds.min():.2f} Å  "
+            f"median={np.median(crystal_rmsds):.2f} Å  "
+            f"poses < {cutoff} Å: {n_success}/{len(poses)}"
+        )
+        result["crystal_rmsds"] = crystal_rmsds
+        result["confidence_rmsd_fig"] = confidence_rmsd_fig
+
+    return result
