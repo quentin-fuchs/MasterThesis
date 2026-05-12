@@ -456,17 +456,8 @@ def view_poses_colored(
     viewer = py3Dmol.view(width=width, height=height)
     viewer.setBackgroundColor("white")
 
-    if receptor_pdb is not None:
-        with open(receptor_pdb, "r", encoding="utf-8") as fh:
-            viewer.addModel(fh.read(), "pdb")
-        viewer.setStyle({"model": 0}, {"cartoon": {"color": "spectrum", "opacity": 0.8}})
-        if show_surface:
-            viewer.addSurface(
-                py3Dmol.VDW,
-                {"opacity": surface_opacity, "color": "white"},
-                {"model": 0},
-            )
-
+    # Add ligand poses first so the receptor ends up as the last model (-1).
+    # zoomTo({"model": -1}) is then guaranteed to centre on the protein.
     for i, (pose, colour) in enumerate(zip(poses, colours)):
         pdb_block = mol_to_pdb_block(pose.mol)
         viewer.addModel(pdb_block, "pdb")
@@ -485,7 +476,19 @@ def view_poses_colored(
             {"model": -1},
         )
 
-    viewer.zoomTo({"model": -1})
+    if receptor_pdb is not None:
+        with open(receptor_pdb, "r", encoding="utf-8") as fh:
+            viewer.addModel(fh.read(), "pdb")
+        viewer.setStyle({"model": -1}, {"cartoon": {"color": "spectrum", "opacity": 0.8}})
+        if show_surface:
+            viewer.addSurface(
+                py3Dmol.VDW,
+                {"opacity": surface_opacity, "color": "white"},
+                {"model": -1},
+            )
+        viewer.zoomTo({"model": -1})
+    else:
+        viewer.zoomTo()
     return viewer
 
 
