@@ -14,6 +14,8 @@ dependencies:
   # ProDy needs to be installed with conda
   - prody==2.2.0
   - scipy==1.12.0
+  # On CSD3 (RHEL8), system libstdc++ lacks GLIBCXX_3.4.29; prepend conda lib at runtime:
+  #   export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
   # All pip dependencies in a single block (YAML merges duplicate keys, so only one - pip: is allowed)
   - pip:
     - --extra-index-url https://download.pytorch.org/whl/cu117
@@ -44,3 +46,5 @@ dependencies:
     - py3Dmol==2.5.4
     - jupyterlab==4.5.7
 
+    # Experiment tracking
+    - wandb

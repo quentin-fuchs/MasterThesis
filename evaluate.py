@@ -22,6 +22,7 @@ from torch_geometric.loader import DataLoader
 from rdkit.Chem import RemoveAllHs
 
 from datasets.pdbbind import PDBBind
+from datasets.process_mols import write_mol_with_coords
 from utils.diffusion_utils import t_to_sigma as t_to_sigma_compl, get_t_schedule
 from utils.sampling import randomize_position, sampling
 from utils.utils import get_model, ExponentialMovingAverage
@@ -110,6 +111,7 @@ if __name__ == '__main__':
     parser.add_argument('--esm_embeddings_path', type=str, default=None, help='If this is set then the LM embeddings at that path will be used for the receptor features')
     parser.add_argument('--moad_esm_embeddings_sequences_path', type=str, default=None, help='')
     parser.add_argument('--chain_cutoff', type=float, default=None, help='Cutoff of the chains from the ligand') # TODO remove
+    parser.add_argument('--save_predictions', action='store_true', default=False, help='Save ranked SDF files per complex (rank1.sdf, rank1_confidence<score>.sdf, ...) like inference.py')
     parser.add_argument('--save_complexes', action='store_true', default=False, help='Save generated complex graphs')
     parser.add_argument('--complexes_save_path', type=str, default=None, help='')
 
@@ -516,6 +518,29 @@ if __name__ == '__main__':
                         for rank, batch_idx in enumerate(np.argsort(rmsd)):
                             visualization_list[batch_idx].write(
                                 f'{args.out_dir}/{data_list[batch_idx]["name"][0]}_{rank + 1}_{rmsd[batch_idx]:.1f}.pdb')
+
+                if args.save_predictions:
+                    write_dir = os.path.join(args.out_dir, orig_complex_graph.name[0])
+                    os.makedirs(write_dir, exist_ok=True)
+                    full_ligand_pos = np.asarray([
+                        complex_graph['ligand'].pos.cpu().numpy() + orig_complex_graph.original_center.cpu().numpy()
+                        for complex_graph in data_list
+                    ])
+                    if confidence is not None:
+                        ordered_pos = full_ligand_pos[re_order]
+                        ordered_conf = confidence[re_order]
+                    else:
+                        ordered_pos = full_ligand_pos
+                        ordered_conf = None
+                    lig = orig_complex_graph.mol[0]
+                    for rank, pos in enumerate(ordered_pos):
+                        mol_pred = copy.deepcopy(lig)
+                        if score_model_args.remove_hs:
+                            mol_pred = RemoveAllHs(mol_pred)
+                        write_mol_with_coords(mol_pred, pos, os.path.join(write_dir, f'rank{rank + 1}.sdf'))
+                        if ordered_conf is not None:
+                            write_mol_with_coords(mol_pred, pos, os.path.join(write_dir, f'rank{rank + 1}_confidence{ordered_conf[rank]:.2f}.sdf'))
+
                 without_rec_overlap_list.append(1 if orig_complex_graph.name[0] in names_no_rec_overlap else 0)
                 names_list.append(orig_complex_graph.name[0])
                 rmsds_list.append(rmsd)

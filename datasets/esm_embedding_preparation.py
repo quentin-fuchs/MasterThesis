@@ -54,6 +54,7 @@ if args.dataset == 'pdbbind':
 
     for name in tqdm(names):
         if name == '.DS_Store': continue
+        if not os.path.isdir(os.path.join(data_dir, name)): continue
         if os.path.exists(os.path.join(data_dir, name, f'{name}_protein_processed.pdb')):
             rec_path = os.path.join(data_dir, name, f'{name}_protein_processed.pdb')
         else:
