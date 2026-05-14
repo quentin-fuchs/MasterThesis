@@ -68,6 +68,127 @@ BUFFER_SET = {
 }
 MIN_HEAVY_ATOMS = 7
 
+# ------------------------------------------------------------------ annotation
+_RCSB_GRAPHQL = "https://data.rcsb.org/graphql"
+
+def _annotation_query(pdb_id):
+    """Build a GraphQL query string for one entry (RCSB does not support variables)."""
+    return (
+        '{ entry(entry_id: "' + pdb_id.upper() + '") {'
+        '  struct_keywords { pdbx_keywords text }'
+        '  rcsb_entry_info  { resolution_combined }'
+        '  polymer_entities {'
+        '    rcsb_polymer_entity { pdbx_ec rcsb_ec_lineage { id name depth } }'
+        '  }'
+        '  nonpolymer_entities {'
+        '    nonpolymer_comp { chem_comp { id name type formula_weight } }'
+        '  }'
+        '} }'
+    )
+
+_ANNOTATION_COLUMNS = [
+    "pdb_id",
+    "protein_class",      # coarse PDB keyword, e.g. "HYDROLASE", "KINASE"
+    "protein_keywords",   # free-text keywords from struct_keywords.text
+    "ec_class",           # top-level EC class name (depth=1), e.g. "Hydrolases"
+    "ec_number",          # full EC number (depth=4), e.g. "2.7.11.1"
+    "resolution_A",       # X-ray resolution in Angstroms
+    "ligand_id",          # PDB 3-letter chemical component code
+    "ligand_name",        # full IUPAC-style name from PDB CCD
+    "ligand_type",        # CCD molecule type, e.g. "non-polymer"
+    "ligand_mw",          # formula weight (Da)
+]
+
+
+def fetch_pdb_annotations(pdb_ids, out_csv):
+    """
+    Query the RCSB PDB GraphQL API for protein and ligand classifications.
+
+    For each PDB ID retrieves:
+      - protein_class / protein_keywords  from struct_keywords
+      - ec_class / ec_number              from the EC lineage of polymer entities
+      - resolution_A                      from rcsb_entry_info
+      - ligand_id / ligand_name / ligand_type / ligand_mw
+            for the primary cognate ligand (heaviest non-solvent nonpolymer entity)
+
+    Results are written to out_csv and returned as a list of dicts.
+    Designed as a lookup table for stratifying downstream DiffDock performance
+    by protein family or ligand type.
+
+    Args:
+        pdb_ids: iterable of 4-character PDB IDs (case-insensitive)
+        out_csv: path to the output CSV file
+
+    Returns:
+        list of dicts, one per PDB ID, with keys matching _ANNOTATION_COLUMNS
+    """
+    import csv
+
+    rows = []
+    for pdb_id in tqdm(pdb_ids, desc="Fetching PDB annotations"):
+        row = {c: "" for c in _ANNOTATION_COLUMNS}
+        row["pdb_id"] = pdb_id.lower()
+        try:
+            payload = json.dumps({"query": _annotation_query(pdb_id)}).encode()
+            req = urllib.request.Request(
+                _RCSB_GRAPHQL, data=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=15) as r:
+                entry = (json.loads(r.read()).get("data") or {}).get("entry") or {}
+
+            # Protein class
+            kw = entry.get("struct_keywords") or {}
+            row["protein_class"]    = (kw.get("pdbx_keywords") or "").strip()
+            row["protein_keywords"] = (kw.get("text") or "").strip()
+
+            # EC number — first polymer entity that has an EC lineage
+            for poly in (entry.get("polymer_entities") or []):
+                rpe = poly.get("rcsb_polymer_entity") or {}
+                lineage = rpe.get("rcsb_ec_lineage") or []
+                if not lineage:
+                    continue
+                for node in lineage:
+                    if node.get("depth") == 1:
+                        row["ec_class"]  = node.get("name", "")
+                    if node.get("depth") == 4:
+                        row["ec_number"] = rpe.get("pdbx_ec", node.get("id", ""))
+                break  # one enzyme entity is sufficient
+
+            # Resolution
+            res_list = ((entry.get("rcsb_entry_info") or {}).get("resolution_combined") or [])
+            valid_res = [r for r in res_list if r is not None]
+            if valid_res:
+                row["resolution_A"] = round(min(valid_res), 2)
+
+            # Cognate ligand: heaviest nonpolymer entity that is not a solvent/ion
+            best_cc = None
+            for np_ent in (entry.get("nonpolymer_entities") or []):
+                cc = ((np_ent.get("nonpolymer_comp") or {}).get("chem_comp") or {})
+                if cc.get("id", "").upper() in BUFFER_SET:
+                    continue
+                if best_cc is None or (cc.get("formula_weight") or 0) > (best_cc.get("formula_weight") or 0):
+                    best_cc = cc
+            if best_cc:
+                row["ligand_id"]   = best_cc.get("id", "").upper()
+                row["ligand_name"] = best_cc.get("name", "")
+                row["ligand_type"] = best_cc.get("type", "")
+                row["ligand_mw"]   = best_cc.get("formula_weight", "")
+
+        except Exception as e:
+            print(f"  Warning: could not fetch {pdb_id}: {e}")
+
+        rows.append(row)
+        time.sleep(0.05)  # stay within RCSB rate limits
+
+    with open(out_csv, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=_ANNOTATION_COLUMNS, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+
+    print(f"Annotations saved → {out_csv}  ({len(rows)} entries)")
+    return rows
+
 
 # ------------------------------------------------------------------ helpers
 def fetch_json(url: str, retries: int = 3, delay: float = 1.0):
@@ -342,7 +463,20 @@ def main():
     parser.add_argument("--out",     default="data/PDBBind_processed")
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--tmp",     default="/tmp/pdbbind_raw")
+    # Annotation mode
+    parser.add_argument("--annotate",    action="store_true",
+                        help="Fetch protein/ligand annotations from RCSB and write a CSV")
+    parser.add_argument("--split_path",  default="data/splits/timesplit_test",
+                        help="One PDB ID per line; used by --annotate")
+    parser.add_argument("--out_csv",     default="data/pdb_annotations.csv",
+                        help="Output CSV path for --annotate")
     args = parser.parse_args()
+
+    if args.annotate:
+        with open(args.split_path) as f:
+            pdb_ids = [l.strip() for l in f if l.strip()]
+        fetch_pdb_annotations(pdb_ids, args.out_csv)
+        return
 
     df = pd.read_csv(args.csv, index_col=0)
     pdb_ids = df["protein_path"].apply(lambda p: p.split("/")[-2]).tolist()
