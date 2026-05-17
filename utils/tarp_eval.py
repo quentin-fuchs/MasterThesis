@@ -39,6 +39,7 @@ Typical usage
 import copy
 import os
 import warnings
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from multiprocessing import Pool
 from pathlib import Path
 
@@ -333,7 +334,7 @@ def _spyrmsd_mol(mol):
     return spyrmsd_molecule.Molecule.from_rdkit(mol)
 
 
-def compute_rmsd_symmetry(mol, ref_coords, query_coords_list):
+def compute_rmsd_symmetry(mol, ref_coords, query_coords_list, timeout=4):
     """Compute symmetry-corrected RMSD between ref_coords and each set of
     query coordinates using spyrmsd.
 
@@ -341,6 +342,10 @@ def compute_rmsd_symmetry(mol, ref_coords, query_coords_list):
         mol: RDKit Mol defining the atom graph.
         ref_coords: numpy array (N_atoms, 3).
         query_coords_list: list of numpy arrays (N_atoms, 3).
+        timeout: seconds allowed per symmrmsd call. Molecules with large
+            symmetry groups (e.g. high internal symmetry) can cause the
+            Hungarian matching to run for minutes; calls exceeding this
+            limit return NaN so the complex is skipped gracefully.
 
     Returns:
         numpy array of shape (len(query_coords_list),). NaN for failed calls.
@@ -353,16 +358,27 @@ def compute_rmsd_symmetry(mol, ref_coords, query_coords_list):
         if qc.shape != ref_coords.shape:
             results.append(np.nan)
             continue
+        # Fresh executor per call so shutdown(wait=False) abandons the thread
+        # immediately on timeout rather than blocking until it finishes.
+        ex = ThreadPoolExecutor(max_workers=1)
+        future = ex.submit(
+            spyrmsd_rmsd.symmrmsd,
+            ref_coords, qc,
+            atomicnums, atomicnums,
+            adjacency, adjacency,
+        )
         try:
-            r = spyrmsd_rmsd.symmrmsd(
-                ref_coords, qc,
-                atomicnums, atomicnums,
-                adjacency, adjacency,
+            results.append(future.result(timeout=timeout))
+        except FuturesTimeout:
+            warnings.warn(
+                f"spyrmsd timed out after {timeout}s — likely high symmetry; returning NaN"
             )
-            results.append(r)
+            results.append(np.nan)
         except Exception as exc:
             warnings.warn(f"spyrmsd failed: {exc}")
             results.append(np.nan)
+        finally:
+            ex.shutdown(wait=False)
     return np.array(results)
 
 
@@ -438,12 +454,12 @@ def _tarp_worker(args):
     Top-level function required for multiprocessing pickling.
 
     Args:
-        args: tuple of (pdb_id, results_index, data_dir, K, mode, seed).
+        args: tuple of (pdb_id, results_index, data_dir, K, mode, seed, max_samples).
 
     Returns:
         (pdb_id, fracs_or_None, error_str_or_None)
     """
-    pdb_id, results_index, data_dir, K, mode, seed = args
+    pdb_id, results_index, data_dir, K, mode, seed, max_samples = args
     warnings.filterwarnings("ignore")
     try:
         crystal_mol, crystal_coords = load_crystal_coords(pdb_id, data_dir)
@@ -451,6 +467,9 @@ def _tarp_worker(args):
         ca_coords = load_protein_ca_coords(pdb_id, data_dir)
     except (FileNotFoundError, ValueError, OSError) as exc:
         return pdb_id, None, f"load error: {exc}"
+
+    if max_samples is not None:
+        sample_coords = sample_coords[:max_samples]
 
     if len(sample_coords) == 0:
         return pdb_id, None, "no valid samples after SDF parsing"
@@ -469,7 +488,7 @@ def _tarp_worker(args):
 
 def run_tarp_eval(
     complex_names, results_index, data_dir,
-    K=100, mode="rmsd", seed=42, verbose=True, n_workers=1
+    K=100, mode="rmsd", seed=42, verbose=True, n_workers=1, _max_samples=None
 ):
     """Run TARP evaluation over all complexes.
 
@@ -483,6 +502,8 @@ def run_tarp_eval(
             so results are identical regardless of n_workers.
         verbose: if True, print progress every 20 complexes.
         n_workers: number of parallel worker processes (1 = serial).
+        _max_samples: if set, only use this many samples per complex (e.g. 1
+            for top-1 evaluation). None uses all available samples.
 
     Returns:
         numpy array of shape (n_valid_complexes, K). Each row is the K
@@ -494,7 +515,7 @@ def run_tarp_eval(
     child_seeds = np.random.SeedSequence(seed).spawn(n)
 
     work = [
-        (pdb_id, results_index, data_dir, K, mode, child_seeds[i])
+        (pdb_id, results_index, data_dir, K, mode, child_seeds[i], _max_samples)
         for i, pdb_id in enumerate(complex_names)
     ]
 
