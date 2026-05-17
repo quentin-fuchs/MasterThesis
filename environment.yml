@@ -47,4 +47,9 @@ dependencies:
     - jupyterlab==4.5.7
 
     # Experiment tracking
-    - wandb
+    - wandb==0.26.1
+
+    #Diffdock evaluation
+    - tarp==0.1.1
+    - mira-score==0.1.7
+    - posebusters==0.6.5
