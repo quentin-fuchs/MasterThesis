@@ -37,6 +37,7 @@ def run_posebusters(
     cache_path: str = None,
     verbose: bool = True,
     max_complexes: int = None,
+    protein_suffix: str = "_protein_processed.pdb",
 ) -> dict:
     """Run PoseBusters on all DiffDock predicted poses for the test set.
 
@@ -48,15 +49,19 @@ def run_posebusters(
         complex_names: iterable of PDB ID strings.
         results_dir: directory containing per-complex subdirectories with
             rank*.sdf files (e.g. testset_eval_merged/).
-        data_dir: root directory containing PDBBind_processed/{pdb_id}/
-            {pdb_id}_protein_processed.pdb.
+        data_dir: root directory containing per-complex subdirectories, each
+            with a protein PDB file named {pdb_id}{protein_suffix}.
         config: PoseBusters mode. "dock" checks geometry and protein clashes
             without requiring a reference crystal pose.
-        cache_path: if given and the file exists, load cached results; if the
-            file does not exist, run PoseBusters and save to this path.
+        cache_path: if given and the file exists with >0 entries, load cached
+            results; if the file does not exist or is empty, run PoseBusters
+            and save to this path.
         verbose: print progress every 20 complexes.
         max_complexes: if given, process only the first N complexes. Useful for
             quick tests before running the full set.
+        protein_suffix: filename suffix for the protein PDB file inside each
+            complex subdirectory. PDBBind uses "_protein_processed.pdb";
+            PoseBusters benchmark uses "_protein.pdb".
 
     Returns:
         dict mapping pdb_id -> {
@@ -72,9 +77,12 @@ def run_posebusters(
     if cache_path and Path(cache_path).exists():
         with open(cache_path) as f:
             cached = json.load(f)
+        if len(cached) > 0:
+            if verbose:
+                print(f"Loaded PoseBusters cache ({len(cached)} complexes) from {cache_path}")
+            return cached
         if verbose:
-            print(f"Loaded PoseBusters cache ({len(cached)} complexes) from {cache_path}")
-        return cached
+            print(f"Cache at {cache_path} is empty — recomputing.")
 
     buster = PoseBusters(config=config)
     results = {}
@@ -89,7 +97,7 @@ def run_posebusters(
             print(f"  [{i}/{n}] {pdb_id} ...", flush=True)
 
         complex_dir = Path(results_dir) / pdb_id
-        protein_file = Path(data_dir) / pdb_id / f"{pdb_id}_protein_processed.pdb"
+        protein_file = Path(data_dir) / pdb_id / f"{pdb_id}{protein_suffix}"
 
         if not complex_dir.exists() or not protein_file.exists():
             if verbose:
@@ -97,12 +105,20 @@ def run_posebusters(
             skipped += 1
             continue
 
-        rank_files = sorted(
-            [f for f in complex_dir.iterdir()
-             if f.name.startswith("rank") and f.name.endswith(".sdf")
-             and "_confidence" not in f.name],
-            key=lambda f: int(f.stem.replace("rank", "")),
-        )
+        plain = [f for f in complex_dir.iterdir()
+                 if f.name.startswith("rank") and f.name.endswith(".sdf")
+                 and "_confidence" not in f.name]
+        if len(plain) > 1:
+            rank_files = sorted(plain, key=lambda f: int(f.stem.replace("rank", "")))
+        else:
+            # inference.py only writes rank1.sdf without confidence suffix;
+            # all other ranks are only stored as rank*_confidence*.sdf
+            rank_files = sorted(
+                [f for f in complex_dir.iterdir()
+                 if f.name.startswith("rank") and "_confidence" in f.name
+                 and f.name.endswith(".sdf")],
+                key=lambda f: int(f.name.split("_confidence")[0].replace("rank", "")),
+            )
 
         if not rank_files:
             skipped += 1
