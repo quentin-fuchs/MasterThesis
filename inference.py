@@ -5,6 +5,7 @@ import traceback
 from argparse import ArgumentParser, Namespace, FileType
 import copy
 import os
+import shutil
 from functools import partial
 import warnings
 from typing import Mapping, Optional
@@ -67,6 +68,7 @@ def get_parser():
                         help='Log level. Default %(default)s')
 
     parser.add_argument('--out_dir', type=str, default='results/user_inference', help='Directory where the outputs will be written to')
+    parser.add_argument('--esm_embeddings_path', type=str, default=None, help='Path to a precomputed ESM embeddings .pt file (keyed by <complex_name>_chain_<j>). If provided, skips inline ESM generation.')
     parser.add_argument('--save_visualisation', action='store_true', default=False, help='Save a pdb file with all of the steps of the reverse diffusion')
     parser.add_argument('--samples_per_complex', type=int, default=10, help='Number of samples to generate')
 
@@ -169,10 +171,25 @@ def main(args):
         write_dir = f'{args.out_dir}/{name}'
         os.makedirs(write_dir, exist_ok=True)
 
+    # load precomputed ESM embeddings if provided, restructuring from flat dict to per-complex list
+    if args.esm_embeddings_path is not None:
+        logger.info(f'Loading precomputed ESM embeddings from {args.esm_embeddings_path}')
+        embeddings_dict = torch.load(args.esm_embeddings_path)
+        precomputed_lm_embeddings = []
+        for name in complex_name_list:
+            chains, j = [], 0
+            while f'{name}_chain_{j}' in embeddings_dict:
+                chains.append(embeddings_dict[f'{name}_chain_{j}'])
+                j += 1
+            precomputed_lm_embeddings.append(chains if chains else None)
+    else:
+        precomputed_lm_embeddings = None
+
     # preprocessing of complexes into geometric graphs
     test_dataset = InferenceDataset(out_dir=args.out_dir, complex_names=complex_name_list, protein_files=protein_path_list,
                                     ligand_descriptions=ligand_description_list, protein_sequences=protein_sequence_list,
                                     lm_embeddings=True,
+                                    precomputed_lm_embeddings=precomputed_lm_embeddings,
                                     receptor_radius=score_model_args.receptor_radius, remove_hs=score_model_args.remove_hs,
                                     c_alpha_max_neighbors=score_model_args.c_alpha_max_neighbors,
                                     all_atoms=score_model_args.all_atoms, atom_radius=score_model_args.atom_radius,
@@ -299,6 +316,10 @@ def main(args):
                 args=args,
                 copy_protein=True,
             )
+
+            ligand_description = ligand_description_list[idx]
+            if ligand_description and os.path.isfile(ligand_description):
+                shutil.copy(ligand_description, os.path.join(write_dir, 'crystal_ligand.sdf'))
 
             # save visualisation frames
             if args.save_visualisation:
