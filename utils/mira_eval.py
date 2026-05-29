@@ -50,7 +50,8 @@ def _load_poses(pdb_id: str, results_index: dict, data_dir: str):
         FileNotFoundError, ValueError: if files are missing or unparseable.
     """
     from utils.tarp_eval import load_crystal_coords, load_sample_coords
-    _, crystal_coords = load_crystal_coords(pdb_id, data_dir)
+    _, all_crystal_coords = load_crystal_coords(pdb_id, data_dir)
+    crystal_coords = all_crystal_coords[0]
     sample_coords = load_sample_coords(pdb_id, results_index)
     return crystal_coords, sample_coords
 

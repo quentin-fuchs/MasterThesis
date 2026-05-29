@@ -87,19 +87,41 @@ def build_results_index(eval_full_dir):
 def load_crystal_coords(pdb_id, data_dir):
     """Load the crystal-pose heavy-atom coordinates and the RDKit mol.
 
+    Tries {pdb_id}_ligands.sdf (plural) first — the PoseBusters dataset stores
+    all crystallographic copies of the ligand there (2–12 molecules per file).
+    Falls back to {pdb_id}_ligand.sdf and {pdb_id}_ligand.mol2 for PDBBind-
+    style datasets that have only a single crystal conformer.
+
     Args:
         pdb_id: PDB identifier string (e.g. "5ze6").
-        data_dir: Root data directory containing PDBBind_processed/
+        data_dir: Root data directory containing per-complex subdirectories.
 
     Returns:
-        (mol, coords): RDKit Mol (heavy atoms, no Hs) and numpy array of
-            shape (N_atoms, 3).
+        (mol, all_coords): RDKit Mol (heavy atoms, no Hs) and a list of numpy
+            arrays each of shape (N_atoms, 3), one per crystal conformer.
+            The list always has at least one element.
 
     Raises:
         FileNotFoundError: if no ligand file is found.
         ValueError: if the ligand file cannot be parsed or has no conformer.
     """
-    sdf_path = os.path.join(data_dir, pdb_id, f"{pdb_id}_ligand.sdf")
+    # Try _ligands.sdf (plural) — may contain multiple crystallographic copies.
+    ligands_path = os.path.join(data_dir, pdb_id, f"{pdb_id}_ligands.sdf")
+    if os.path.exists(ligands_path):
+        supplier = Chem.SDMolSupplier(ligands_path, removeHs=True)
+        canonical_mol = None
+        all_coords = []
+        for mol in supplier:
+            if mol is None or mol.GetNumConformers() == 0:
+                continue
+            if canonical_mol is None:
+                canonical_mol = mol
+            all_coords.append(mol.GetConformer().GetPositions())
+        if canonical_mol is not None and all_coords:
+            return canonical_mol, all_coords
+
+    # Fall back to _ligand.sdf / _ligand.mol2 (single conformer).
+    sdf_path  = os.path.join(data_dir, pdb_id, f"{pdb_id}_ligand.sdf")
     mol2_path = os.path.join(data_dir, pdb_id, f"{pdb_id}_ligand.mol2")
     for path in [sdf_path, mol2_path]:
         if not os.path.exists(path):
@@ -113,7 +135,7 @@ def load_crystal_coords(pdb_id, data_dir):
             continue
         if mol.GetNumConformers() == 0:
             raise ValueError(f"{pdb_id}: ligand file has no conformer")
-        return mol, mol.GetConformer().GetPositions()
+        return mol, [mol.GetConformer().GetPositions()]
     raise FileNotFoundError(f"No readable ligand file for {pdb_id} in {data_dir}")
 
 
@@ -129,12 +151,23 @@ def load_sample_coords(pdb_id, results_index):
         if some rank files contain NaN coordinates (failed inference samples).
     """
     complex_dir = results_index[pdb_id]
-    rank_files = sorted(
-        [f for f in complex_dir.iterdir()
-         if f.name.startswith("rank") and f.name.endswith(".sdf")
-         and "_confidence" not in f.name],
-        key=lambda f: int(f.stem.replace("rank", ""))
-    )
+
+    # Prefer plain rank*.sdf files (evaluate.py style).
+    # Fall back to rank*_confidence*.sdf (inference.py only writes rank1.sdf
+    # without the confidence suffix, but writes all ranks with it).
+    plain = [f for f in complex_dir.iterdir()
+             if f.name.startswith("rank") and f.name.endswith(".sdf")
+             and "_confidence" not in f.name]
+    if len(plain) > 1:
+        rank_files = sorted(plain, key=lambda f: int(f.stem.replace("rank", "")))
+    else:
+        rank_files = sorted(
+            [f for f in complex_dir.iterdir()
+             if f.name.startswith("rank") and "_confidence" in f.name
+             and f.name.endswith(".sdf")],
+            key=lambda f: int(f.name.split("_confidence")[0].replace("rank", ""))
+        )
+
     coords_list = []
     for sdf_file in rank_files:
         mol = Chem.SDMolSupplier(str(sdf_file), removeHs=True)[0]
@@ -153,7 +186,9 @@ def load_protein_ca_coords(pdb_id, data_dir):
     Returns:
         numpy array of shape (N_residues, 3).
     """
-    pdb_path = os.path.join(data_dir, pdb_id, f"{pdb_id}_protein_processed.pdb")
+    processed = os.path.join(data_dir, pdb_id, f"{pdb_id}_protein_processed.pdb")
+    fallback  = os.path.join(data_dir, pdb_id, f"{pdb_id}_protein.pdb")
+    pdb_path  = processed if os.path.exists(processed) else fallback
     prot = pr.parsePDB(pdb_path)
     return prot.ca.getCoords()
 
@@ -382,6 +417,31 @@ def compute_rmsd_symmetry(mol, ref_coords, query_coords_list, timeout=4):
     return np.array(results)
 
 
+def compute_rmsd_symmetry_multi(mol, all_ref_coords, query_coords_list, timeout=4):
+    """Compute symmetry-corrected RMSD taking the minimum over multiple crystal conformers.
+
+    Calls compute_rmsd_symmetry once per crystal conformer and returns the
+    element-wise minimum across conformers. When all_ref_coords has length 1
+    the result is identical to calling compute_rmsd_symmetry directly.
+
+    Args:
+        mol: RDKit Mol defining the atom graph.
+        all_ref_coords: list of numpy arrays (N_atoms, 3), one per crystal conformer.
+        query_coords_list: list of numpy arrays (N_atoms, 3) — predicted poses.
+        timeout: passed through to compute_rmsd_symmetry.
+
+    Returns:
+        numpy array of shape (len(query_coords_list),). Each value is the
+        minimum symRMSD to any crystal conformer. NaN where all conformers
+        returned NaN for that pose.
+    """
+    per_ref = np.stack([
+        compute_rmsd_symmetry(mol, ref, query_coords_list, timeout=timeout)
+        for ref in all_ref_coords
+    ])  # shape (n_crystal, S)
+    return np.nanmin(per_ref, axis=0)
+
+
 def compute_centroid_distance(ref_coords, query_coords_list):
     """Compute Euclidean centroid-to-centroid distance.
 
@@ -462,7 +522,8 @@ def _tarp_worker(args):
     pdb_id, results_index, data_dir, K, mode, seed, max_samples = args
     warnings.filterwarnings("ignore")
     try:
-        crystal_mol, crystal_coords = load_crystal_coords(pdb_id, data_dir)
+        crystal_mol, all_crystal_coords = load_crystal_coords(pdb_id, data_dir)
+        crystal_coords = all_crystal_coords[0]
         sample_coords = load_sample_coords(pdb_id, results_index)
         ca_coords = load_protein_ca_coords(pdb_id, data_dir)
     except (FileNotFoundError, ValueError, OSError) as exc:

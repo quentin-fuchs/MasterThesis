@@ -245,7 +245,8 @@ def compute_rmsd_accuracy_filtered(
             continue
 
         try:
-            _, crystal = load_crystal_coords(pdb_id, data_dir)
+            _, all_crystal = load_crystal_coords(pdb_id, data_dir)
+            crystal = all_crystal[0]
         except Exception as exc:
             if verbose:
                 print(f"    Skipping {pdb_id}: {exc}")
@@ -335,7 +336,8 @@ def compute_mira_filtered(
             continue
 
         try:
-            _, crystal = load_crystal_coords(pdb_id, data_dir)
+            _, all_crystal = load_crystal_coords(pdb_id, data_dir)
+            crystal = all_crystal[0]
         except Exception as exc:
             if verbose:
                 print(f"    Skipping {pdb_id}: {exc}")
