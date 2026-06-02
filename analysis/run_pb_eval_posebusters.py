@@ -16,8 +16,8 @@ sys.path.insert(0, "/home/qf226/MProject/DiffDock")
 
 from utils.posebusters_eval import run_posebusters
 
-RESULTS_DIR = "/home/qf226/MProject/DiffDock/results/posebusters_inference"
-DATA_DIR    = "/home/qf226/MProject/DiffDock/data/posebusters_benchmark_set"
+RESULTS_DIR = "/home/qf226/rds/hpc-work/results/DiffDock/pb_evaluate_v2_merged"
+DATA_DIR    = "/home/qf226/rds/hpc-work/data/posebusters_benchmark_set"
 CACHE       = f"{RESULTS_DIR}/metrics/posebusters_results_pb.json"
 
 from pathlib import Path

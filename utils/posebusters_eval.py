@@ -72,25 +72,31 @@ def run_posebusters(
                              all poses for this complex.
         }
     """
-    from posebusters import PoseBusters
-
+    cached = {}
     if cache_path and Path(cache_path).exists():
         with open(cache_path) as f:
             cached = json.load(f)
-        if len(cached) > 0:
+        if verbose and cached:
+            print(f"Loaded PoseBusters cache ({len(cached)} complexes) from {cache_path}")
+        if not cached:
             if verbose:
-                print(f"Loaded PoseBusters cache ({len(cached)} complexes) from {cache_path}")
-            return cached
-        if verbose:
-            print(f"Cache at {cache_path} is empty — recomputing.")
+                print(f"Cache at {cache_path} is empty — recomputing.")
 
-    buster = PoseBusters(config=config)
-    results = {}
     complex_names = list(complex_names)
     if max_complexes is not None:
         complex_names = complex_names[:max_complexes]
+    # Only process complexes not already in the cache
+    complex_names = [n for n in complex_names if n not in cached]
+    if not complex_names:
+        return cached
+
+    from posebusters import PoseBusters
+    buster = PoseBusters(config=config)
+    results = dict(cached)  # start from existing cache entries
     n = len(complex_names)
     skipped = 0
+    if verbose:
+        print(f"Running PoseBusters on {n} new complexes ...")
 
     for i, pdb_id in enumerate(complex_names):
         if verbose and i % 20 == 0:
@@ -154,10 +160,13 @@ def run_posebusters(
         }
 
     if verbose:
-        n_valid = sum(len(v["valid_ranks"]) for v in results.values())
-        n_total = sum(v["n_total"] for v in results.values())
-        print(f"Done. {len(results)} complexes processed, {skipped} skipped.")
-        print(f"Valid poses: {n_valid}/{n_total} ({n_valid/n_total*100:.1f}%)")
+        new_results = {k: v for k, v in results.items() if k not in cached}
+        n_valid = sum(len(v["valid_ranks"]) for v in new_results.values())
+        n_total = sum(v["n_total"] for v in new_results.values())
+        print(f"Done. {len(new_results)} new complexes processed, {skipped} skipped.")
+        if n_total:
+            print(f"Valid poses (new): {n_valid}/{n_total} ({n_valid/n_total*100:.1f}%)")
+        print(f"Total in cache: {len(results)} complexes")
 
     if cache_path:
         with open(cache_path, "w") as f:
