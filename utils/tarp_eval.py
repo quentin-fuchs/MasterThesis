@@ -715,17 +715,3 @@ def plot_ecp(ecp, alpha, ax=None, label=None, color=None, bootstrap_ecps=None):
             fontsize=8, color="grey")
     return ax
 
-
-def atc_score(ecp, alpha):
-    """Signed area between the ECP curve and the diagonal (ATC score).
-
-    Positive = over-dispersed, negative = mode-collapsed, 0 = calibrated.
-
-    Args:
-        ecp: numpy array of ECP values.
-        alpha: numpy array of credibility levels.
-
-    Returns:
-        float.
-    """
-    return float(_trapz(ecp - alpha, alpha))
