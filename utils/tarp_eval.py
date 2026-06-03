@@ -36,6 +36,7 @@ Typical usage
 >>> plot_ecp(ecp, alpha, bootstrap_ecps=boot_ecps)
 """
 
+import contextlib
 import copy
 import os
 import warnings
@@ -170,7 +171,8 @@ def load_sample_coords(pdb_id, results_index):
 
     coords_list = []
     for sdf_file in rank_files:
-        mol = Chem.SDMolSupplier(str(sdf_file), removeHs=True)[0]
+        with open(os.devnull, "w") as devnull, contextlib.redirect_stderr(devnull):
+            mol = Chem.SDMolSupplier(str(sdf_file), removeHs=True)[0]
         if mol is not None:
             coords_list.append(mol.GetConformer().GetPositions())
     return coords_list
