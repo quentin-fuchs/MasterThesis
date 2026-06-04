@@ -38,7 +38,7 @@ warnings.filterwarnings("ignore")
 # ── path setup ────────────────────────────────────────────────────────────────
 _HERE = Path(__file__).resolve().parent
 _SIGMADOCK_SRC = _HERE.parent / "src"
-_DIFFDOCK_DIR  = _HERE.parents[2] / "DiffDock"
+_DIFFDOCK_DIR  = _HERE.parents[1] / "DiffDock"
 
 sys.path.insert(0, str(_SIGMADOCK_SRC))
 sys.path.insert(0, str(_DIFFDOCK_DIR))
@@ -172,8 +172,9 @@ def run_tarp(
         lig_ref, sample_coords = complex_data[cid]
         crystal = lig_ref.GetConformer().GetPositions()
 
+        pdb_id = cid.split("::")[0]
         try:
-            ca_coords = load_protein_ca_coords(cid, data_dir)
+            ca_coords = load_protein_ca_coords(pdb_id, data_dir)
         except Exception as exc:
             print(f"    Skipping {cid} (protein load error): {exc}", flush=True)
             skipped += 1
