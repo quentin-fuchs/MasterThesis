@@ -38,6 +38,11 @@ MANIFEST
 instance/
 .webassets-cache
 
+# Claude Code
+CLAUDE.md
+.claude/
+logs/
+
 # other stuff
 todo.py
 wandb/
