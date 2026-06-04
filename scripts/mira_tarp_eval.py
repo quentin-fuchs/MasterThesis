@@ -228,10 +228,17 @@ def main(args: argparse.Namespace) -> None:
           f"{len(next(iter(complex_data.values()))[1])} seeds each.\n")
 
     # ── MIRA ──────────────────────────────────────────────────────────────────
-    print("=== MIRA ===")
-    mira_names, mira_scores = run_mira(
-        complex_data, num_runs=args.num_runs, metric=args.metric
-    )
+    if args.skip_mira:
+        print("=== MIRA skipped (--skip-mira) ===")
+        existing = np.load(str(model_dir / "mira_tarp.npz"), allow_pickle=True)
+        mira_names  = existing["mira_names"]
+        mira_scores = existing["mira_scores"]
+        print(f"  Loaded {len(mira_scores)} cached MIRA scores.")
+    else:
+        print("=== MIRA ===")
+        mira_names, mira_scores = run_mira(
+            complex_data, num_runs=args.num_runs, metric=args.metric
+        )
 
     # ── TARP ──────────────────────────────────────────────────────────────────
     tarp_names = np.array([], dtype=object)
@@ -320,4 +327,6 @@ if __name__ == "__main__":
                         help="MIRA distance metric (default euclidean)")
     parser.add_argument("--output", default=None,
                         help="Output .npz path (default: <results_dir>/mira_tarp.npz)")
+    parser.add_argument("--skip-mira", action="store_true",
+                        help="Skip MIRA and load scores from existing mira_tarp.npz")
     main(parser.parse_args())
