@@ -834,7 +834,7 @@ def extract_pocket_com(
     return com
 
 
-def read_pdb_from_string(pdb_string: str, as_biopython: bool = False) -> Union[Chem.Mol, PDB.Structure]:
+def read_pdb_from_string(pdb_string: str, as_biopython: bool = False) -> Union[Chem.Mol, PDB.Structure.Structure]:
     """Parses a PDB string into a Biopython Structure | Mol object."""
     tmp = None
     if as_biopython:

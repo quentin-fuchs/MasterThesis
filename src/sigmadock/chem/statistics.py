@@ -525,7 +525,7 @@ def clean_statistics_scores(  # noqa: C901
         raise AssertionError("Mismatch in number of seeds in pb_dict")
     n_pb = next(iter(lengths_pb))
 
-    if scores is not None:
+    if scores:
         lengths_scores = {len(v) for v in scores.values()}
         if len(lengths_scores) != 1:
             raise AssertionError("Mismatch in number of seeds in scores")
