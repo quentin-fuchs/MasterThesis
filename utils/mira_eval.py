@@ -27,6 +27,11 @@ import torch
 
 warnings.filterwarnings("ignore")
 
+# Lazy import to avoid circular dependency at module load time.
+def _get_compute_rmsd_symmetry():
+    from utils.tarp_eval import compute_rmsd_symmetry
+    return compute_rmsd_symmetry
+
 # Reference MIRA score under perfect calibration for S samples.
 # E[calib] = (2/3) / ((S-1+1)/(S-1+2)) = (2/3) * (S+1)/S
 # For S=40: (2/3) * 41/40 ≈ 0.6833
@@ -56,9 +61,103 @@ def _load_poses(pdb_id: str, results_index: dict, data_dir: str):
     return crystal_coords, sample_coords
 
 
+def _mira_one_complex_symrmsd(
+    crystal_mol,
+    crystal_coords: np.ndarray,
+    sample_coords: list,
+    num_runs: int,
+    rng,
+    timeout: int = 4,
+) -> float:
+    """MIRA score using symmetry-corrected pairwise RMSD (spyrmsd).
+
+    Replaces the flat-Euclidean distance used by the `mira_score` library with
+    symmetry-corrected heavy-atom RMSD. Bypasses `mira_score.mira` entirely and
+    re-implements the random-radius MIRA estimator directly, following the same
+    pattern as `group_mira_eval._mira_score_translation`.
+
+    Precomputes the full (1+S) × (1+S) pairwise symRMSD matrix D (index 0 =
+    crystal, 1..S = samples), then for each of `num_runs` iterations:
+      - draws a random posterior sample as the center,
+      - draws a distinct reference sample to set the ball radius,
+      - checks what fraction of remaining samples and the crystal fall inside.
+
+    The null reference `mira_null(S)` applies because under perfect calibration
+    (crystal exchangeable with samples) the rank of d(center, crystal) among
+    d(center, sample_j) is uniform on {1..S} for any distance metric.
+
+    Args:
+        crystal_mol: RDKit Mol (heavy atoms) defining the molecular graph for
+            the symRMSD atom-permutation search.
+        crystal_coords: (N_atoms, 3) crystal pose coordinates.
+        sample_coords: list of (N_atoms, 3) predicted pose coordinates.
+        num_runs: number of Monte Carlo center draws.
+        rng: numpy Generator.
+        timeout: per-call timeout in seconds passed to `compute_rmsd_symmetry`.
+            High-symmetry molecules that exceed this limit return NaN.
+
+    Returns:
+        MIRA score (float), or NaN if fewer than 2 samples or all runs fail.
+    """
+    S = len(sample_coords)
+    if S < 2:
+        return float("nan")
+
+    compute_rmsd_symmetry = _get_compute_rmsd_symmetry()
+    all_coords = [crystal_coords] + list(sample_coords)  # length 1 + S
+
+    # Build symmetric (1+S, 1+S) pairwise symRMSD matrix.
+    D = np.full((1 + S, 1 + S), np.nan)
+    np.fill_diagonal(D, 0.0)
+    for i in range(1 + S):
+        targets = all_coords[i + 1:]
+        if not targets:
+            continue
+        row = compute_rmsd_symmetry(crystal_mol, all_coords[i], targets, timeout=timeout)
+        for offset, val in enumerate(row):
+            j = i + 1 + offset
+            D[i, j] = val
+            D[j, i] = val
+
+    N = S - 1
+    scores = []
+    sample_indices = np.arange(1, 1 + S)  # indices 1..S in D
+
+    for _ in range(num_runs):
+        # Random center: a posterior sample
+        i = int(rng.choice(sample_indices))
+        # Random reference: another posterior sample
+        other_samples = sample_indices[sample_indices != i]
+        j = int(rng.choice(other_samples))
+
+        r = D[i, j]
+        if not np.isfinite(r):
+            continue
+
+        d_crystal = D[0, i]
+
+        # Distances from center to all remaining samples (exclude i and j)
+        rest = sample_indices[(sample_indices != i) & (sample_indices != j)]
+        d_rest = D[i, rest]
+        finite_mask = np.isfinite(d_rest)
+        d_finite = d_rest[finite_mask]
+        N_f = len(d_finite)
+
+        counts = int((d_finite < r).sum())
+        k_flag = float(np.isfinite(d_crystal) and d_crystal <= r)
+        prob_in  = (counts + 1) / (N_f + 2)
+        prob_out = (N_f - counts + 1) / (N_f + 2)
+        mv = (N_f + 1) / (N_f + 2)
+        scores.append((prob_in * k_flag + prob_out * (1 - k_flag)) / mv)
+
+    return float(np.nanmean(scores)) if scores else float("nan")
+
+
 def _mira_one_complex(crystal: np.ndarray, samples: list, num_runs: int,
                       device: torch.device,
-                      metric: str = "euclidean") -> float:
+                      metric: str = "euclidean",
+                      mol=None,
+                      rng=None) -> float:
     """Run MIRA for a single complex (T=1).
 
     Normalises all poses jointly (subtract joint mean, divide by joint std)
@@ -69,20 +168,31 @@ def _mira_one_complex(crystal: np.ndarray, samples: list, num_runs: int,
         crystal: (n_atoms, 3) crystal pose.
         samples: list of (n_atoms, 3) predicted poses.
         num_runs: number of Monte Carlo center draws.
-        device: torch device.
-        metric: distance metric passed to MIRA.
+        device: torch device (ignored for metric="symrmsd").
+        metric: distance metric.
             "euclidean" — Euclidean distance in flat q-space, equivalent to
-                          scaled RMSD (√n_atoms × RMSD). Current default.
+                          scaled RMSD (√n_atoms × RMSD). Default.
             "rmsd"      — divides the normalised flat vectors by √n_atoms so
                           the Euclidean distance equals per-atom-average RMSD.
+            "symrmsd"   — symmetry-corrected heavy-atom RMSD via spyrmsd.
+                          Bypasses mira_score.mira; mol and rng must be provided.
+        mol: RDKit Mol (heavy atoms). Required when metric="symrmsd".
+        rng: numpy Generator. Required when metric="symrmsd".
 
     Returns:
         MIRA score (float), or NaN if fewer than 2 samples.
     """
+    if metric == "symrmsd":
+        if mol is None:
+            raise ValueError("mol must be provided when metric='symrmsd'")
+        if rng is None:
+            rng = np.random.default_rng()
+        return _mira_one_complex_symrmsd(mol, crystal, samples, num_runs, rng)
+
     from mira_score import mira
 
     if metric not in ("euclidean", "rmsd"):
-        raise ValueError(f"metric must be 'euclidean' or 'rmsd', got {metric!r}")
+        raise ValueError(f"metric must be 'euclidean', 'rmsd', or 'symrmsd', got {metric!r}")
 
     if len(samples) < 2:
         return float("nan")
@@ -119,6 +229,7 @@ def compute_mira_scores(
     verbose: bool = True,
     device: torch.device = None,
     metric: str = "euclidean",
+    seed: int = 42,
 ) -> tuple:
     """Compute per-complex MIRA scores over the full test set.
 
@@ -133,21 +244,29 @@ def compute_mira_scores(
         num_runs: Monte Carlo runs per complex (controls center-placement
             variance; 100 gives stable per-complex scores).
         verbose: print progress every 20 complexes.
-        device: torch device; auto-detected if None.
-        metric: "euclidean" (default, scaled RMSD) or "rmsd" (per-atom RMSD).
+        device: torch device; auto-detected if None (ignored for symrmsd).
+        metric: "euclidean" (default, scaled RMSD), "rmsd" (per-atom RMSD),
+            or "symrmsd" (symmetry-corrected RMSD via spyrmsd).
             See _mira_one_complex for details.
+        seed: master random seed used for per-complex rngs when
+            metric="symrmsd". Ignored for other metrics.
 
     Returns:
         (names_out, scores): two numpy arrays of length n_valid. names_out
         contains the PDB IDs of successfully evaluated complexes; scores
         contains the corresponding MIRA scores.
     """
-    from mira_score import get_device
-    if device is None:
-        device = get_device()
+    from utils.tarp_eval import load_crystal_coords as _load_crystal_mol
+
+    use_symrmsd = metric == "symrmsd"
+    if not use_symrmsd:
+        from mira_score import get_device
+        if device is None:
+            device = get_device()
 
     complex_names = list(complex_names)
     n = len(complex_names)
+    child_seeds = np.random.SeedSequence(seed).spawn(n) if use_symrmsd else None
     names_out, scores = [], []
     skipped = 0
 
@@ -162,8 +281,22 @@ def compute_mira_scores(
             skipped += 1
             continue
 
-        score = _mira_one_complex(crystal, samples, num_runs=num_runs,
-                                  device=device, metric=metric)
+        if use_symrmsd:
+            try:
+                crystal_mol, _ = _load_crystal_mol(pdb_id, data_dir)
+            except Exception as exc:
+                if verbose:
+                    print(f"    Skipping {pdb_id} (mol load): {exc}", flush=True)
+                skipped += 1
+                continue
+            rng = np.random.default_rng(child_seeds[i])
+            score = _mira_one_complex(crystal, samples, num_runs=num_runs,
+                                      device=device, metric=metric,
+                                      mol=crystal_mol, rng=rng)
+        else:
+            score = _mira_one_complex(crystal, samples, num_runs=num_runs,
+                                      device=device, metric=metric)
+
         if not np.isnan(score):
             names_out.append(pdb_id)
             scores.append(score)
