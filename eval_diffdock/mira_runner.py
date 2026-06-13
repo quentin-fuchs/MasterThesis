@@ -78,8 +78,7 @@ def compute_mira_scores(
     """
     use_symrmsd = metric == "symrmsd"
     if not use_symrmsd:
-        from mira_score import get_device
-        device = get_device()
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     else:
         device = None
 
@@ -218,3 +217,46 @@ def compute_rmsd_accuracy(
         np.array(min_rmsds, dtype=float),
         np.array(fracs, dtype=float),
     )
+
+
+def load_poses(pdb_id: str, results_index: dict, data_dir: str) -> list:
+    """Load heavy-atom coordinate arrays for all DiffDock samples of one complex.
+
+    Args:
+        pdb_id: PDB identifier string.
+        results_index: dict from build_results_index().
+        data_dir: root data directory (unused here, kept for API symmetry).
+
+    Returns:
+        list of (N_atoms, 3) numpy arrays, one per sample.
+    """
+    return load_sample_coords(pdb_id, results_index)
+
+
+def compute_mira_one_complex(
+    crystal: np.ndarray,
+    samples: list,
+    num_runs: int = 100,
+    device=None,
+    metric: str = "rmsd",
+) -> float:
+    """Compute MIRA score for a single complex.
+
+    Args:
+        crystal: (N_atoms, 3) crystal ligand coordinates.
+        samples: list of (N_atoms, 3) predicted coordinate arrays.
+        num_runs: Monte Carlo center draws.
+        device: torch device (used for euclidean/rmsd metrics).
+        metric: "euclidean" or "rmsd".
+
+    Returns:
+        MIRA score as a float (nan if computation fails).
+    """
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if len(samples) < 2:
+        return float("nan")
+    try:
+        return float(_mira_euclidean(crystal, samples, num_runs, device, metric))
+    except Exception:
+        return float("nan")
