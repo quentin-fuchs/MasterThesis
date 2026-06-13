@@ -125,6 +125,7 @@ local_config_inference2.yml
 # Local-only: cluster scripts and personal evaluation splits
 slurm/
 .claude/
+CLAUDE.md
 data/splits/pb_100_random.txt
 data/splits/pb_extra120_eval.txt
 data/splits/pdbbind_test_100_random.txt

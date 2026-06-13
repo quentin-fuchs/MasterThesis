@@ -92,3 +92,4 @@ Diffusion data flow:
 - Multi-fragment ligands previously caused a torsion assertion error; fixed in commit `c0d7779`
 - SO(2)/SO(3) look-up tables are precomputed on first run and cached as `.npy` files in the project root — takes a few minutes, done once
 - Confidence score thresholds: `c > 0` high, `-1.5 < c < 0` moderate, `c < -1.5` low (valid for drug-like small molecules on medium-sized proteins)
+- **`--config` yaml overrides CLI args, not the other way around.** `evaluate.py` (and `inference.py`) call `parser.parse_args()` first, then load the yaml and unconditionally overwrite `args.__dict__`. Any key present in the yaml silently wins over the CLI flag. To change a value that's in the yaml, edit the yaml (or use a separate yaml) — passing a CLI flag for it does nothing.

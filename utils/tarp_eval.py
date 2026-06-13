@@ -647,6 +647,21 @@ def ecp_from_fractions(f_matrix, n_bins=50):
     return ecp, alpha
 
 
+def atc_score(ecp, alpha):
+    """Area-under-TARP-Curve: integral of (ECP(α) - α) over [0,1].
+
+    Positive → over-dispersed; negative → mode-collapsed; zero → calibrated.
+
+    Args:
+        ecp: numpy array of ECP values (shape n_bins).
+        alpha: numpy array of credibility levels (shape n_bins).
+
+    Returns:
+        Scalar ATC value.
+    """
+    return float(np.trapz(ecp - alpha, alpha))
+
+
 def bootstrap_ecp(f_matrix, n_bins=50, n_bootstrap=500, rng=None):
     """Bootstrap confidence bands for the ECP by resampling complexes.
 
@@ -676,7 +691,7 @@ def bootstrap_ecp(f_matrix, n_bins=50, n_bootstrap=500, rng=None):
     return boot_ecps
 
 
-def plot_ecp(ecp, alpha, ax=None, label=None, color=None, bootstrap_ecps=None):
+def plot_ecp(ecp, alpha, ax=None, label=None, color=None, bootstrap_ecps=None, linestyle='solid'):
     """Plot an ECP curve against the perfect-calibration diagonal.
 
     Args:
@@ -688,6 +703,7 @@ def plot_ecp(ecp, alpha, ax=None, label=None, color=None, bootstrap_ecps=None):
         bootstrap_ecps: optional numpy array of shape (n_bootstrap, n_bins)
             from bootstrap_ecp(), used to draw a 90 % confidence band.
             Should be bootstrapped over complexes, not individual fractions.
+        linestyle: matplotlib linestyle string (default 'solid').
 
     Returns:
         matplotlib Axes.
@@ -696,7 +712,7 @@ def plot_ecp(ecp, alpha, ax=None, label=None, color=None, bootstrap_ecps=None):
         _, ax = plt.subplots(figsize=(5, 5))
 
     c = color or "C0"
-    ax.plot(alpha, ecp, color=c, lw=2, label=label)
+    ax.plot(alpha, ecp, color=c, lw=2, label=label, linestyle=linestyle)
     if bootstrap_ecps is not None:
         lo = np.percentile(bootstrap_ecps, 5, axis=0)
         hi = np.percentile(bootstrap_ecps, 95, axis=0)

@@ -31,7 +31,7 @@ WHITELIST_PATH = DIFFDOCK_DIR / "data/splits/pb_sensitivity_rand100.txt"
 DATA_DIR = str(RDS / "data/posebusters_benchmark_set")
 
 BASELINE_DIR = RDS / "results/DiffDock/pb_evaluate_v2_merged"
-SENS_ROOT    = RDS / "results/DiffDock/sensitivity_ode_nsteps"
+SENS_ROOT    = RDS / "results/DiffDock/sensitivity_ode_nsteps_v2"
 
 CONDITIONS = {
     "sde_20": BASELINE_DIR,
