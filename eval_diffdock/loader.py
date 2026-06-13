@@ -17,22 +17,35 @@ warnings.filterwarnings("ignore")
 
 
 def build_results_index(eval_full_dir):
-    """Scan all chunk_* subdirectories and return a mapping from complex name
-    to the directory containing its rank*.sdf prediction files.
+    """Return a mapping from complex name to its rank*.sdf directory.
+
+    Handles two directory layouts produced by DiffDock's evaluate.py:
+
+    - Chunked (PDBBind style): chunk_0/, chunk_1/, ... each containing
+      one subdir per complex.
+    - Flat (PoseBusters merged style): one subdir per complex directly
+      at the top level, alongside a metrics/ directory.
 
     Args:
-        eval_full_dir: path to the top-level results directory containing
-            chunk_0/, chunk_1/, ... subdirectories.
+        eval_full_dir: path to the top-level results directory.
 
     Returns:
         dict mapping complex_name (str) to Path of the complex subdirectory.
     """
-    index = {}
-    for chunk_dir in sorted(Path(eval_full_dir).glob("chunk_*")):
-        for complex_dir in chunk_dir.iterdir():
-            if complex_dir.is_dir():
-                index[complex_dir.name] = complex_dir
-    return index
+    p = Path(eval_full_dir)
+    chunks = sorted(p.glob("chunk_*"))
+    if chunks:
+        index = {}
+        for chunk_dir in chunks:
+            for complex_dir in chunk_dir.iterdir():
+                if complex_dir.is_dir():
+                    index[complex_dir.name] = complex_dir
+        return index
+    # Flat layout: every subdir that is not 'metrics' or 'logs' is a complex
+    return {
+        d.name: d for d in p.iterdir()
+        if d.is_dir() and d.name not in ("metrics", "logs")
+    }
 
 
 def load_crystal_coords(pdb_id, data_dir):

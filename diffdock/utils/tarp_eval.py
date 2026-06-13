@@ -13,7 +13,12 @@ from molcalib.distances import (
     compute_rmsd_symmetry_multi,
     compute_centroid_distance,
 )
-from molcalib.prior import prepare_reference_template, generate_reference_coords
+from molcalib.prior import (
+    prepare_reference_template,
+    generate_reference_coords,
+    _INITIAL_NOISE_STD_PROPORTION,
+    _random_rotation_matrix,
+)
 from eval_diffdock.loader import (
     build_results_index,
     load_crystal_coords,
