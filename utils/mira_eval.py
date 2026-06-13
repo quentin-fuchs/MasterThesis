@@ -314,7 +314,7 @@ def compute_mira_scores(
         ]
         n_done = 0
         with Pool(processes=n_workers) as pool:
-            for pdb_id, score, err in pool.imap(_mira_symrmsd_worker, work):
+            for pdb_id, score, err in pool.imap_unordered(_mira_symrmsd_worker, work):
                 if verbose and n_done % 20 == 0:
                     print(f"  [{n_done}/{n}] {pdb_id} ...", flush=True)
                 n_done += 1
