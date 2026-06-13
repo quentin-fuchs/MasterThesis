@@ -100,7 +100,7 @@ def load_sigmadock_poses(model_dir: Path) -> dict:
 # ── MIRA ──────────────────────────────────────────────────────────────────────
 
 def run_mira(complex_data: dict, num_runs: int = 100, metric: str = "euclidean",
-             seed: int = 42) -> tuple:
+             seed: int = 42, data_dir: str = None) -> tuple:
     """Compute per-complex MIRA scores.
 
     Args:
@@ -108,16 +108,24 @@ def run_mira(complex_data: dict, num_runs: int = 100, metric: str = "euclidean",
         num_runs: Monte Carlo center draws per complex.
         metric: "euclidean" (default), "rmsd", or "symrmsd".
         seed: master random seed for per-complex rngs (symrmsd only).
+        data_dir: PoseBusters dataset root. Required when metric="symrmsd"
+            (needed to load protein Cα coordinates for the prior).
 
     Returns:
         (names, scores): numpy arrays of shape (n_valid,).
     """
     use_symrmsd = metric == "symrmsd"
+    if use_symrmsd and data_dir is None:
+        raise ValueError("data_dir must be provided when metric='symrmsd'")
+
     if not use_symrmsd:
         from mira_score import get_device
         device = get_device()
     else:
         device = None
+        from utils.tarp_eval import (
+            load_protein_ca_coords, prepare_reference_template,
+        )
 
     complex_ids = list(complex_data)
     n = len(complex_ids)
@@ -133,11 +141,19 @@ def run_mira(complex_data: dict, num_runs: int = 100, metric: str = "euclidean",
         crystal = lig_ref.GetConformer().GetPositions()  # (N, 3)
 
         if use_symrmsd:
+            pdb_id = cid.split("::")[0]
+            try:
+                ca_coords = load_protein_ca_coords(pdb_id, data_dir)
+                template_mol, rot_bonds = prepare_reference_template(lig_ref)
+            except Exception as exc:
+                print(f"    Skipping {cid} (setup): {exc}", flush=True)
+                continue
             rng = np.random.default_rng(child_seeds[i])
             score = _mira_one_complex(
                 crystal, sample_coords,
                 num_runs=num_runs, device=device, metric=metric,
                 mol=lig_ref, rng=rng,
+                template_mol=template_mol, rot_bonds=rot_bonds, ca_coords=ca_coords,
             )
         else:
             score = _mira_one_complex(
@@ -255,7 +271,8 @@ def main(args: argparse.Namespace) -> None:
     else:
         print("=== MIRA ===")
         mira_names, mira_scores = run_mira(
-            complex_data, num_runs=args.num_runs, metric=args.metric, seed=42
+            complex_data, num_runs=args.num_runs, metric=args.metric, seed=42,
+            data_dir=args.data_dir
         )
 
     # ── TARP ──────────────────────────────────────────────────────────────────
