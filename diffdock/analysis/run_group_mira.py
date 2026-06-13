@@ -42,10 +42,15 @@ import time
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_DIFFDOCK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_THESIS   = os.path.dirname(_DIFFDOCK)
+for _p in (_DIFFDOCK, _THESIS):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
-from utils.tarp_eval import build_results_index
-from utils.group_mira_eval import run_group_mira_eval, mira_null
+from eval_diffdock.loader import build_results_index
+from eval_diffdock.group_mira_runner import run_group_mira_eval
+from molcalib.mira import mira_null
 
 
 def _build_flat_index(results_dir):

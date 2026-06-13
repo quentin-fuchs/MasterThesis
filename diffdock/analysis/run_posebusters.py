@@ -7,9 +7,9 @@ Run via SLURM: sbatch ~/slurm/diffdock_posebusters.sh
 import sys
 import numpy as np
 
-sys.path.insert(0, "/home/qf226/MProject/DiffDock")
+sys.path.insert(0, "/home/qf226/MProject/thesis")
 
-from utils.posebusters_eval import run_posebusters
+from eval_diffdock.pb_eval import run_posebusters
 
 MERGED    = "/home/qf226/MProject/DiffDock/results/testset_eval_merged"
 DATA_DIR  = "/home/qf226/MProject/DiffDock/data/PDBBind_processed"

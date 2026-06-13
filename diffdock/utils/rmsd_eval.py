@@ -13,16 +13,19 @@ Typical usage
 >>> print(f"Top-1 < 2Å: {(top1 < 2).mean() * 100:.1f}%")
 """
 
+import sys
 import warnings
 from pathlib import Path
 
 import numpy as np
 
-from utils.tarp_eval import (
-    load_crystal_coords,
-    load_sample_coords,
-    compute_rmsd_symmetry_multi,
-)
+# eval_diffdock is in the thesis root (not pip-installed)
+_THESIS_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_THESIS_ROOT) not in sys.path:
+    sys.path.insert(0, str(_THESIS_ROOT))
+
+from eval_diffdock.loader import load_crystal_coords, load_sample_coords
+from molcalib import compute_rmsd_symmetry_multi
 
 warnings.filterwarnings("ignore")
 

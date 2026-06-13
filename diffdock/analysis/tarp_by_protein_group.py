@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from utils.tarp_eval import ecp_from_fractions, bootstrap_ecp, plot_ecp, atc_score
+from molcalib.tarp import ecp_from_fractions, bootstrap_ecp, plot_ecp, atc_score
 
 # ---------------------------------------------------------------------------
 # Paths

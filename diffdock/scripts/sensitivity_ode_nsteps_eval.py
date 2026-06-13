@@ -24,10 +24,10 @@ from pathlib import Path
 
 import numpy as np
 
-DIFFDOCK_DIR = Path("/home/qf226/MProject/DiffDock")
+THESIS_DIR = Path("/home/qf226/MProject/thesis")
 RDS = Path("/home/qf226/rds/hpc-work")
 # 100 complexes randomly sampled from all 308 PB complexes (seed=42)
-WHITELIST_PATH = DIFFDOCK_DIR / "data/splits/pb_sensitivity_rand100.txt"
+WHITELIST_PATH = THESIS_DIR / "diffdock" / "data" / "splits" / "pb_sensitivity_rand100.txt"
 DATA_DIR = str(RDS / "data/posebusters_benchmark_set")
 
 BASELINE_DIR = RDS / "results/DiffDock/pb_evaluate_v2_merged"
@@ -40,10 +40,12 @@ CONDITIONS = {
     "ode_20": SENS_ROOT / "ode_20",
 }
 
-sys.path.insert(0, str(DIFFDOCK_DIR))
+sys.path.insert(0, str(THESIS_DIR))
 
-from utils.mira_eval import compute_mira_scores, mira_null
-from utils.tarp_eval import run_tarp_eval, ecp_from_fractions
+from eval_diffdock.mira_runner import compute_mira_scores
+from molcalib.mira import mira_null
+from eval_diffdock.tarp_runner import run_tarp_eval
+from molcalib.tarp import ecp_from_fractions
 
 
 def build_flat_index(results_dir: Path) -> dict:

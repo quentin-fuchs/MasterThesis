@@ -38,11 +38,15 @@ import time
 
 import numpy as np
 
-# Make project root importable when invoked from analysis/
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Make diffdock/ and thesis/ importable when invoked from analysis/
+_DIFFDOCK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_THESIS   = os.path.dirname(_DIFFDOCK)
+for _p in (_DIFFDOCK, _THESIS):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
-from utils.tarp_eval import build_results_index
-from utils.group_eval import run_group_tarp_eval, run_group_distances
+from eval_diffdock.loader import build_results_index
+from eval_diffdock.group_tarp_runner import run_group_tarp_eval, run_group_distances
 
 
 def _build_flat_index(results_dir):

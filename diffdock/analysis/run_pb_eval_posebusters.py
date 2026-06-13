@@ -12,9 +12,9 @@ Run via SLURM:
 import sys
 import numpy as np
 
-sys.path.insert(0, "/home/qf226/MProject/DiffDock")
+sys.path.insert(0, "/home/qf226/MProject/thesis")
 
-from utils.posebusters_eval import run_posebusters
+from eval_diffdock.pb_eval import run_posebusters
 
 RESULTS_DIR = "/home/qf226/rds/hpc-work/results/DiffDock/pb_evaluate_v2_merged"
 DATA_DIR    = "/home/qf226/rds/hpc-work/data/posebusters_benchmark_set"
