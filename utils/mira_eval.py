@@ -221,6 +221,38 @@ def _mira_one_complex(crystal: np.ndarray, samples: list, num_runs: int,
     return float(score[0].cpu())
 
 
+def _mira_symrmsd_worker(args):
+    """Multiprocessing worker for symRMSD MIRA evaluation of one complex.
+
+    Top-level function required for pickling by multiprocessing.Pool.
+
+    Args:
+        args: tuple of (pdb_id, results_index, data_dir, num_runs, seed).
+
+    Returns:
+        (pdb_id, score_or_nan, error_str_or_None)
+    """
+    pdb_id, results_index, data_dir, num_runs, seed = args
+    import warnings
+    warnings.filterwarnings("ignore")
+    try:
+        from utils.tarp_eval import load_crystal_coords, load_sample_coords
+        crystal_mol, all_crystal = load_crystal_coords(pdb_id, data_dir)
+        crystal_coords = all_crystal[0]
+        samples = load_sample_coords(pdb_id, results_index)
+    except Exception as exc:
+        return pdb_id, float("nan"), f"load error: {exc}"
+    if len(samples) < 2:
+        return pdb_id, float("nan"), "too few samples"
+    try:
+        rng = np.random.default_rng(seed)
+        score = _mira_one_complex_symrmsd(crystal_mol, crystal_coords, samples,
+                                          num_runs, rng)
+        return pdb_id, score, None
+    except Exception as exc:
+        return pdb_id, float("nan"), f"compute error: {exc}"
+
+
 def compute_mira_scores(
     complex_names,
     results_index: dict,
@@ -230,6 +262,7 @@ def compute_mira_scores(
     device: torch.device = None,
     metric: str = "euclidean",
     seed: int = 42,
+    n_workers: int = 1,
 ) -> tuple:
     """Compute per-complex MIRA scores over the full test set.
 
@@ -250,6 +283,9 @@ def compute_mira_scores(
             See _mira_one_complex for details.
         seed: master random seed used for per-complex rngs when
             metric="symrmsd". Ignored for other metrics.
+        n_workers: number of parallel worker processes. Only used when
+            metric="symrmsd"; ignored otherwise (mira_score.mira is not
+            fork-safe). 1 = serial.
 
     Returns:
         (names_out, scores): two numpy arrays of length n_valid. names_out
@@ -270,38 +306,60 @@ def compute_mira_scores(
     names_out, scores = [], []
     skipped = 0
 
-    for i, pdb_id in enumerate(complex_names):
-        if verbose and i % 20 == 0:
-            print(f"  [{i}/{n}] {pdb_id} ...", flush=True)
-        try:
-            crystal, samples = _load_poses(pdb_id, results_index, data_dir)
-        except Exception as exc:
-            if verbose:
-                print(f"    Skipping {pdb_id}: {exc}", flush=True)
-            skipped += 1
-            continue
-
-        if use_symrmsd:
+    if use_symrmsd and n_workers > 1:
+        from multiprocessing import Pool
+        work = [
+            (pdb_id, results_index, data_dir, num_runs, child_seeds[i])
+            for i, pdb_id in enumerate(complex_names)
+        ]
+        n_done = 0
+        with Pool(processes=n_workers) as pool:
+            for pdb_id, score, err in pool.imap(_mira_symrmsd_worker, work):
+                if verbose and n_done % 20 == 0:
+                    print(f"  [{n_done}/{n}] {pdb_id} ...", flush=True)
+                n_done += 1
+                if err is not None:
+                    if verbose:
+                        print(f"    Skipping {pdb_id}: {err}", flush=True)
+                    skipped += 1
+                elif np.isfinite(score):
+                    names_out.append(pdb_id)
+                    scores.append(score)
+                else:
+                    skipped += 1
+    else:
+        for i, pdb_id in enumerate(complex_names):
+            if verbose and i % 20 == 0:
+                print(f"  [{i}/{n}] {pdb_id} ...", flush=True)
             try:
-                crystal_mol, _ = _load_crystal_mol(pdb_id, data_dir)
+                crystal, samples = _load_poses(pdb_id, results_index, data_dir)
             except Exception as exc:
                 if verbose:
-                    print(f"    Skipping {pdb_id} (mol load): {exc}", flush=True)
+                    print(f"    Skipping {pdb_id}: {exc}", flush=True)
                 skipped += 1
                 continue
-            rng = np.random.default_rng(child_seeds[i])
-            score = _mira_one_complex(crystal, samples, num_runs=num_runs,
-                                      device=device, metric=metric,
-                                      mol=crystal_mol, rng=rng)
-        else:
-            score = _mira_one_complex(crystal, samples, num_runs=num_runs,
-                                      device=device, metric=metric)
 
-        if not np.isnan(score):
-            names_out.append(pdb_id)
-            scores.append(score)
-        else:
-            skipped += 1
+            if use_symrmsd:
+                try:
+                    crystal_mol, _ = _load_crystal_mol(pdb_id, data_dir)
+                except Exception as exc:
+                    if verbose:
+                        print(f"    Skipping {pdb_id} (mol load): {exc}", flush=True)
+                    skipped += 1
+                    continue
+                rng = np.random.default_rng(child_seeds[i])
+                score = _mira_one_complex(crystal, samples, num_runs=num_runs,
+                                          device=device, metric=metric,
+                                          mol=crystal_mol, rng=rng)
+            else:
+                score = _mira_one_complex(crystal, samples, num_runs=num_runs,
+                                          device=device, metric=metric)
+
+            if not np.isnan(score):
+                names_out.append(pdb_id)
+                scores.append(score)
+            else:
+                skipped += 1
 
     if verbose:
         S_typical = 40
