@@ -99,33 +99,51 @@ def load_sigmadock_poses(model_dir: Path) -> dict:
 
 # ── MIRA ──────────────────────────────────────────────────────────────────────
 
-def run_mira(complex_data: dict, num_runs: int = 100, metric: str = "euclidean") -> tuple:
+def run_mira(complex_data: dict, num_runs: int = 100, metric: str = "euclidean",
+             seed: int = 42) -> tuple:
     """Compute per-complex MIRA scores.
 
     Args:
         complex_data: output of load_sigmadock_poses().
         num_runs: Monte Carlo center draws per complex.
-        metric: "euclidean" (default) or "rmsd".
+        metric: "euclidean" (default), "rmsd", or "symrmsd".
+        seed: master random seed for per-complex rngs (symrmsd only).
 
     Returns:
         (names, scores): numpy arrays of shape (n_valid,).
     """
-    from mira_score import get_device
-    device = get_device()
+    use_symrmsd = metric == "symrmsd"
+    if not use_symrmsd:
+        from mira_score import get_device
+        device = get_device()
+    else:
+        device = None
+
+    complex_ids = list(complex_data)
+    n = len(complex_ids)
+    child_seeds = np.random.SeedSequence(seed).spawn(n) if use_symrmsd else None
 
     names, scores = [], []
-    n = len(complex_data)
 
-    for i, (cid, (lig_ref, sample_coords)) in enumerate(complex_data.items()):
+    for i, cid in enumerate(complex_ids):
         if i % 20 == 0:
             print(f"  MIRA [{i}/{n}] {cid} ...", flush=True)
 
+        lig_ref, sample_coords = complex_data[cid]
         crystal = lig_ref.GetConformer().GetPositions()  # (N, 3)
 
-        score = _mira_one_complex(
-            crystal, sample_coords,
-            num_runs=num_runs, device=device, metric=metric,
-        )
+        if use_symrmsd:
+            rng = np.random.default_rng(child_seeds[i])
+            score = _mira_one_complex(
+                crystal, sample_coords,
+                num_runs=num_runs, device=device, metric=metric,
+                mol=lig_ref, rng=rng,
+            )
+        else:
+            score = _mira_one_complex(
+                crystal, sample_coords,
+                num_runs=num_runs, device=device, metric=metric,
+            )
         if not np.isnan(score):
             names.append(cid)
             scores.append(score)
@@ -237,7 +255,7 @@ def main(args: argparse.Namespace) -> None:
     else:
         print("=== MIRA ===")
         mira_names, mira_scores = run_mira(
-            complex_data, num_runs=args.num_runs, metric=args.metric
+            complex_data, num_runs=args.num_runs, metric=args.metric, seed=42
         )
 
     # ── TARP ──────────────────────────────────────────────────────────────────
@@ -323,8 +341,9 @@ if __name__ == "__main__":
                         help="ECP bootstrap replicates (default 200)")
     parser.add_argument("--num-runs", type=int, default=100,
                         help="MIRA Monte Carlo draws per complex (default 100)")
-    parser.add_argument("--metric", choices=["euclidean", "rmsd"], default="euclidean",
-                        help="MIRA distance metric (default euclidean)")
+    parser.add_argument("--metric", choices=["euclidean", "rmsd", "symrmsd"],
+                        default="euclidean",
+                        help="MIRA distance metric: euclidean (default), rmsd, or symrmsd")
     parser.add_argument("--output", default=None,
                         help="Output .npz path (default: <results_dir>/mira_tarp.npz)")
     parser.add_argument("--skip-mira", action="store_true",
