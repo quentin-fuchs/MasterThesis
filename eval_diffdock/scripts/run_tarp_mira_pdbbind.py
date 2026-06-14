@@ -5,8 +5,8 @@ Merges run_tarp_rmsd_pdbbind.py and run_mira_pdbbind.py into one job so the
 results index and SDF files are loaded only once.
 
 Saves to metrics/:
-  tarp_fractions_rmsd_K10.npy  — TARP fractions (n, 10), sym-corrected RMSD
-  tarp_fractions_rmsd_K1.npy   — TARP fractions (n,  1)
+  tarp_fractions_symrmsd_K10.npy  — TARP fractions (n, 10), sym-corrected RMSD
+  tarp_fractions_symrmsd_K1.npy   — TARP fractions (n,  1)
   mira_names_symrmsd.npy       — complex names for MIRA (sym-corrected RMSD)
   mira_scores_symrmsd.npy      — per-complex MIRA scores
   rmsd_accuracy.npz            — top-1 and any-sample RMSD accuracy
@@ -35,7 +35,7 @@ print(f"Complexes: {len(complex_names)}, indexed: {len(results_index)}")
 
 # --- TARP RMSD K=10 ---
 K = 10
-out_K = f"{METRICS}/tarp_fractions_rmsd_K{K}.npy"
+out_K = f"{METRICS}/tarp_fractions_symrmsd_K{K}.npy"
 if os.path.exists(out_K):
     print(f"K={K} already exists, skipping.")
 else:
@@ -46,7 +46,7 @@ else:
     print(f"Saved {out_K}  shape={f.shape}")
 
 # --- TARP RMSD K=1 ---
-out_K1 = f"{METRICS}/tarp_fractions_rmsd_K1.npy"
+out_K1 = f"{METRICS}/tarp_fractions_symrmsd_K1.npy"
 if os.path.exists(out_K1):
     print("K=1 already exists, skipping.")
 else:

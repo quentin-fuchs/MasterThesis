@@ -5,7 +5,7 @@ Merges run_tarp_rmsd_pb_benchmark.py and run_mira_pb_benchmark.py into one job
 so the results index and SDF files are loaded only once.
 
 Saves to metrics/:
-  tarp_fractions_rmsd_K1.npy  — TARP fractions (n, 1), sym-corrected RMSD
+  tarp_fractions_symrmsd_K1.npy  — TARP fractions (n, 1), sym-corrected RMSD
   mira_names_symrmsd.npy      — complex names for MIRA (sym-corrected RMSD)
   mira_scores_symrmsd.npy     — per-complex MIRA scores
 
@@ -32,7 +32,7 @@ complex_names = np.array(sorted(results_index.keys()))
 print(f"Complexes: {len(complex_names)}")
 
 # --- TARP RMSD K=1 ---
-out_K1 = f"{METRICS}/tarp_fractions_rmsd_K1.npy"
+out_K1 = f"{METRICS}/tarp_fractions_symrmsd_K1.npy"
 if os.path.exists(out_K1):
     print("K=1 already exists, skipping.")
 else:
