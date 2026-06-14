@@ -13,11 +13,7 @@ import warnings
 from pathlib import Path
 
 import numpy as np
-import torch
 from rdkit import Chem
-
-from molcalib.mira import mira_null
-from eval_diffdock.loader import load_crystal_coords
 
 warnings.filterwarnings("ignore")
 
@@ -198,6 +194,7 @@ def compute_rmsd_accuracy_filtered(
         (names_out, min_rmsds, fracs): three arrays.
     """
     from molcalib.distances import rmsd as _rmsd
+    from eval_diffdock.loader import load_crystal_coords
 
     complex_names = list(complex_names)
     n = len(complex_names)
@@ -273,6 +270,9 @@ def compute_mira_filtered(
     Returns:
         (names_out, scores): two numpy arrays.
     """
+    import torch
+    from molcalib.mira import mira_null
+    from eval_diffdock.loader import load_crystal_coords
     from eval_diffdock.mira_runner import compute_mira_one_complex
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

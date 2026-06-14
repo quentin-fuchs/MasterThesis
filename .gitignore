@@ -46,6 +46,10 @@ env/
 *.svg
 *.pdf
 
+# SLURM scripts (keep in ~/slurm/ only; curate manually what goes in the repo)
+eval_diffdock/slurm/
+eval_sigmadock/slurm/
+
 # Misc
 .DS_Store
 *.swp
