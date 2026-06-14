@@ -94,7 +94,8 @@ def compute_mira_scores(
             for i, pdb_id in enumerate(complex_names)
         ]
         n_done = 0
-        with Pool(processes=n_workers) as pool:
+        pool = Pool(processes=n_workers)
+        try:
             for pdb_id, score, err in pool.imap_unordered(_mira_symrmsd_worker, work):
                 if verbose and n_done % 20 == 0:
                     print(f"  [{n_done}/{n}] {pdb_id} ...", flush=True)
@@ -108,6 +109,10 @@ def compute_mira_scores(
                     scores_out.append(score)
                 else:
                     skipped += 1
+        finally:
+            pool.terminate()
+            # pool.join() omitted: workers holding C extensions (torch/RDKit/spyrmsd)
+            # don't respond to SIGTERM, so join() blocks indefinitely.
     else:
         from molcalib.prior import prepare_reference_template
         for i, pdb_id in enumerate(complex_names):

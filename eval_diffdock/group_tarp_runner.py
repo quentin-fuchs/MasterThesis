@@ -575,9 +575,12 @@ def run_group_tarp_eval(
         n_rot_bonds_out.append(res["n_rot_bonds"])
 
     if n_workers > 1:
-        with Pool(processes=n_workers) as pool:
+        pool = Pool(processes=n_workers)
+        try:
             for result in pool.imap(_group_tarp_worker, work):
                 _handle(result)
+        finally:
+            pool.terminate()
     else:
         for result in map(_group_tarp_worker, work):
             _handle(result)
@@ -672,9 +675,12 @@ def run_group_distances(
             all_results.append((pdb_id, dists))
 
     if n_workers > 1:
-        with Pool(processes=n_workers) as pool:
+        pool = Pool(processes=n_workers)
+        try:
             for result in pool.imap(_group_distances_worker, work):
                 _handle(result)
+        finally:
+            pool.terminate()
     else:
         for result in map(_group_distances_worker, work):
             _handle(result)

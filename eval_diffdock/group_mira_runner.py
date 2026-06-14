@@ -323,9 +323,12 @@ def run_group_mira_eval(
                 group_scores[g].append(score)
 
     if n_workers > 1:
-        with Pool(processes=n_workers) as pool:
+        pool = Pool(processes=n_workers)
+        try:
             for result in pool.imap(_group_mira_worker, work):
                 _handle(result)
+        finally:
+            pool.terminate()
     else:
         for result in map(_group_mira_worker, work):
             _handle(result)

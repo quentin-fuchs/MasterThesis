@@ -106,9 +106,12 @@ def run_tarp_eval(
             rows.append(fracs[:K])
 
     if n_workers > 1:
-        with Pool(processes=n_workers) as pool:
+        pool = Pool(processes=n_workers)
+        try:
             for result in pool.imap(_tarp_worker, work):
                 _handle(result)
+        finally:
+            pool.terminate()
     else:
         for result in map(_tarp_worker, work):
             _handle(result)
