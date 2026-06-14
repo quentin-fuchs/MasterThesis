@@ -6,8 +6,8 @@ so the results index and SDF files are loaded only once.
 
 Saves to metrics/:
   tarp_fractions_rmsd_K1.npy  — TARP fractions (n, 1), sym-corrected RMSD
-  mira_names_rmsd.npy         — complex names for MIRA (plain RMSD, not sym-corrected)
-  mira_scores_rmsd.npy        — per-complex MIRA scores
+  mira_names_symrmsd.npy      — complex names for MIRA (sym-corrected RMSD)
+  mira_scores_symrmsd.npy     — per-complex MIRA scores
 
 Run via SLURM:
     sbatch ~/slurm/thesis/run_tarp_mira_pb_benchmark.sh
@@ -43,8 +43,8 @@ else:
     print(f"Saved {out_K1}  shape={f.shape}")
 
 # --- MIRA scores (sym-corrected RMSD via spyrmsd) ---
-out_mira_scores = f"{METRICS}/mira_scores_rmsd.npy"
-out_mira_names  = f"{METRICS}/mira_names_rmsd.npy"
+out_mira_scores = f"{METRICS}/mira_scores_symrmsd.npy"
+out_mira_names  = f"{METRICS}/mira_names_symrmsd.npy"
 if os.path.exists(out_mira_scores):
     print("MIRA scores already exist, skipping.")
 else:
