@@ -4,8 +4,9 @@ sys.path.insert(0, "/home/qf226/MProject/DiffDock")
 from pathlib import Path
 import numpy as np
 
-RESULTS_DIR = "/home/qf226/rds/hpc-work/results/DiffDock/pb_evaluate_v2_merged"
-METRICS_DIR = f"{RESULTS_DIR}/metrics"
+PB_DIR      = "/home/qf226/rds/hpc-work/results/DiffDock/pb_evaluate_v2_merged"
+RESULTS_DIR = f"{PB_DIR}/poses"
+METRICS_DIR = f"{PB_DIR}/metrics"
 
 complex_names = sorted(
     d.name for d in Path(RESULTS_DIR).iterdir()

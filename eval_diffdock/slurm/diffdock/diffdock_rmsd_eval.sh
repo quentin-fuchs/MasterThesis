@@ -34,7 +34,7 @@ if [ "$DATASET" = "pdbbind" ]; then
 elif [ "$DATASET" = "posebusters" ]; then
     echo "=== PoseBusters benchmark ==="
     python eval_diffdock/scripts/run_rmsd_eval.py \
-        --results_dir $RDS/results/DiffDock/pb_evaluate_v2_merged \
+        --results_dir $RDS/results/DiffDock/pb_evaluate_v2_merged/poses \
         --data_dir    $RDS/data/posebusters_benchmark_set \
         --out_dir     $RDS/results/DiffDock/pb_evaluate_v2_merged/metrics \
         --max_samples 40

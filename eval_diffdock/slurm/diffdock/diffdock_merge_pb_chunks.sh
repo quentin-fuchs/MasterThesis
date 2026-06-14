@@ -13,7 +13,7 @@
 THESIS_DIR=/home/qf226/MProject/thesis
 RDS_RESULTS=/home/qf226/rds/hpc-work/results
 CHUNKS_DIR=$RDS_RESULTS/pb_evaluate_v2
-OUT_DIR=$RDS_RESULTS/pb_evaluate_v2_merged
+OUT_DIR=$RDS_RESULTS/pb_evaluate_v2_merged/poses
 
 source ~/.bashrc
 conda activate diffdock

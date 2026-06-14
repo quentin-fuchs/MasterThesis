@@ -2,7 +2,7 @@
 Evaluate MIRA and centroid TARP for the ODE / n_steps sensitivity study.
 
 Conditions compared:
-  sde_20  (baseline) — ~/rds/hpc-work/results/DiffDock/pb_evaluate_v2_merged/
+  sde_20  (baseline) — ~/rds/hpc-work/results/DiffDock/pb_evaluate_v2_merged/poses/
   sde_10             — sensitivity_ode_nsteps/sde_10/
   sde_50             — sensitivity_ode_nsteps/sde_50/
   ode_20             — sensitivity_ode_nsteps/ode_20/
@@ -30,7 +30,7 @@ RDS = Path("/home/qf226/rds/hpc-work")
 WHITELIST_PATH = THESIS_DIR / "diffdock" / "data" / "splits" / "pb_sensitivity_rand100.txt"
 DATA_DIR = str(RDS / "data/posebusters_benchmark_set")
 
-BASELINE_DIR = RDS / "results/DiffDock/pb_evaluate_v2_merged"
+BASELINE_DIR = RDS / "results/DiffDock/pb_evaluate_v2_merged/poses"
 SENS_ROOT    = RDS / "results/DiffDock/sensitivity_ode_nsteps_v2"
 
 CONDITIONS = {

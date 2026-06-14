@@ -21,9 +21,10 @@ import numpy as np
 
 warnings.filterwarnings("ignore")
 
-RESULTS_DIR = "/home/qf226/rds/hpc-work/results/DiffDock/pb_evaluate_v2_merged"
+PB_DIR      = "/home/qf226/rds/hpc-work/results/DiffDock/pb_evaluate_v2_merged"
+RESULTS_DIR = f"{PB_DIR}/poses"
 DATA_DIR    = "/home/qf226/rds/hpc-work/data/posebusters_benchmark_set"
-METRICS     = f"{RESULTS_DIR}/metrics"
+METRICS     = f"{PB_DIR}/metrics"
 CACHE       = f"{METRICS}/posebusters_results_pb.json"
 
 complex_names = sorted(

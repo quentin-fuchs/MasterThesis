@@ -20,9 +20,10 @@ from eval_diffdock.loader import build_results_index
 from eval_diffdock.tarp_runner import run_tarp_eval
 from eval_diffdock.mira_runner import compute_mira_scores
 
-RESULTS_DIR = "/home/qf226/rds/hpc-work/results/DiffDock/pb_evaluate_v2_merged"
+PB_DIR      = "/home/qf226/rds/hpc-work/results/DiffDock/pb_evaluate_v2_merged"
+RESULTS_DIR = os.path.join(PB_DIR, "poses")
 DATA_DIR    = "/home/qf226/rds/hpc-work/data/posebusters_benchmark_set"
-METRICS     = os.path.join(RESULTS_DIR, "metrics")
+METRICS     = os.path.join(PB_DIR, "metrics")
 
 N_WORKERS = int(os.environ.get("N_WORKERS", 1))
 

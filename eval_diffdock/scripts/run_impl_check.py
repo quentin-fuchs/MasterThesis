@@ -41,7 +41,7 @@ if THESIS_DIR not in sys.path:
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 RDS          = "/home/qf226/rds/hpc-work"
-RESULTS_DIR  = os.environ.get("RESULTS_DIR",  f"{RDS}/results/DiffDock/pb_evaluate_v2_merged")
+RESULTS_DIR  = os.environ.get("RESULTS_DIR",  f"{RDS}/results/DiffDock/pb_evaluate_v2_merged/poses")
 DATA_DIR     = os.environ.get("DATA_DIR",     f"{RDS}/data/posebusters_benchmark_set")
 METRICS_DIR  = os.environ.get("METRICS_DIR",  f"{RDS}/results/DiffDock/pb_evaluate_v2_merged/metrics")
 OUT_DIR      = os.environ.get("OUT_DIR",      f"{METRICS_DIR}/molcalib_check")

@@ -36,7 +36,7 @@ SCORING_PB_CHECKS = [
     "minimum_distance_to_protein",
 ]
 
-RESULTS_DIR = "/home/qf226/rds/hpc-work/results/DiffDock/pb_evaluate_v2_merged"
+RESULTS_DIR = "/home/qf226/rds/hpc-work/results/DiffDock/pb_evaluate_v2_merged/poses"
 
 
 def compute_mixed_score(affinity: float | None, p: float | None, beta: float = 4.0) -> float | None:
@@ -124,7 +124,7 @@ def main() -> None:
     )
     df = pd.DataFrame(rows, columns=columns)
 
-    metrics_dir = results_dir / "metrics"
+    metrics_dir = results_dir.parent / "metrics"
     metrics_dir.mkdir(exist_ok=True)
     out_csv = metrics_dir / f"rescoring_{args.scoring}.csv"
     df.to_csv(out_csv, index=False)

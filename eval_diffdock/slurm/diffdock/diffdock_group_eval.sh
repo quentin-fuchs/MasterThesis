@@ -33,6 +33,7 @@ if [ "$DATASET" = "pdbbind" ]; then
         --data_dir          $RDS/data/PDBBind_processed \
         --out_dir           $RDS/results/DiffDock/pdbbind_testset/metrics/group_eval \
         --K 100 \
+        --num_runs 100 \
         --seed 42 \
         --n_workers "$N_WORKERS"
 
@@ -40,10 +41,11 @@ elif [ "$DATASET" = "posebusters" ]; then
     echo "[group_eval] Running on PoseBusters benchmark (pb_evaluate_v2_merged)"
     python eval_diffdock/scripts/run_group_eval.py \
         --complex_names_npy $RDS/results/DiffDock/pb_evaluate_v2_merged/metrics/complex_names.npy \
-        --results_dir       $RDS/results/DiffDock/pb_evaluate_v2_merged \
+        --results_dir       $RDS/results/DiffDock/pb_evaluate_v2_merged/poses \
         --data_dir          $RDS/data/posebusters_benchmark_set \
         --out_dir           $RDS/results/DiffDock/pb_evaluate_v2_merged/metrics/group_eval \
         --K 100 \
+        --num_runs 100 \
         --seed 42 \
         --n_workers "$N_WORKERS"
 

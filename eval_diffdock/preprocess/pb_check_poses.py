@@ -44,7 +44,7 @@ SCORING_PB_CHECKS = [
     "minimum_distance_to_protein",
 ]
 
-RESULTS_DIR = "/home/qf226/rds/hpc-work/results/DiffDock/pb_evaluate_v2_merged"
+RESULTS_DIR = "/home/qf226/rds/hpc-work/results/DiffDock/pb_evaluate_v2_merged/poses"
 DATA_DIR = "/home/qf226/rds/hpc-work/data/posebusters_benchmark_set"
 
 

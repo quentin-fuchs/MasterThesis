@@ -7,8 +7,8 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=24G
 #SBATCH --time=05:00:00
-#SBATCH --output=/home/qf226/MProject/DiffDock/logs/diffdock_mira_symrmsd_%j.out
-#SBATCH --error=/home/qf226/MProject/DiffDock/logs/diffdock_mira_symrmsd_%j.err
+#SBATCH --output=/home/qf226/MProject/thesis/diffdock/logs/diffdock_mira_symrmsd_%j.out
+#SBATCH --error=/home/qf226/MProject/thesis/diffdock/logs/diffdock_mira_symrmsd_%j.err
 
 # Compute MIRA scores with symmetry-corrected RMSD (spyrmsd) for the full
 # DiffDock PoseBusters benchmark (308 complexes, 40 samples each).
@@ -17,18 +17,18 @@
 #   mira_names_symrmsd.npy   — PDB IDs of successfully evaluated complexes
 #   mira_scores_symrmsd.npy  — corresponding per-complex MIRA scores
 
-DIFFDOCK_DIR=/home/qf226/MProject/DiffDock
+THESIS_DIR=/home/qf226/MProject/thesis
 RDS=/home/qf226/rds/hpc-work
-export RESULTS_DIR=$RDS/results/DiffDock/pb_evaluate_v2
+export RESULTS_DIR=$RDS/results/DiffDock/pb_evaluate_v2_merged/poses
 export METRICS_DIR=$RDS/results/DiffDock/pb_evaluate_v2_merged/metrics
 export DATA_DIR=$RDS/data/posebusters_benchmark_set
 
 source ~/.bashrc
 conda activate diffdock
 export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"
-export PYTHONPATH="$DIFFDOCK_DIR:$PYTHONPATH"
+export PYTHONPATH="$THESIS_DIR:$PYTHONPATH"
 
-cd "$DIFFDOCK_DIR"
+cd "$THESIS_DIR/diffdock"
 mkdir -p logs
 
 echo "=== DiffDock PoseBusters — MIRA symRMSD evaluation ==="
@@ -42,16 +42,17 @@ echo
 python - <<'EOF'
 import sys, warnings, numpy as np
 from pathlib import Path
-sys.path.insert(0, '.')
 warnings.filterwarnings('ignore')
 
 import os
 RESULTS_DIR = os.environ['RESULTS_DIR']
 METRICS_DIR = os.environ['METRICS_DIR']
 DATA_DIR    = os.environ['DATA_DIR']
+THESIS_DIR  = os.environ.get('PYTHONPATH', '').split(':')[0]
 
-from utils.tarp_eval import build_results_index
-from utils.mira_eval  import compute_mira_scores, mira_null
+from eval_diffdock.loader import build_results_index
+from eval_diffdock.mira_runner import compute_mira_scores
+from molcalib.mira import mira_null
 
 # Load complex names from existing metrics
 complex_names = np.load(f"{METRICS_DIR}/complex_names.npy", allow_pickle=True)
