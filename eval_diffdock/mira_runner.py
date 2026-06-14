@@ -3,6 +3,7 @@
 Wraps molcalib.mira with DiffDock-specific data loading and multiprocessing.
 """
 
+import time
 import warnings
 from multiprocessing import Pool
 
@@ -27,6 +28,8 @@ def _mira_symrmsd_worker(args):
         (pdb_id, score_or_nan, error_str_or_None)
     """
     pdb_id, results_index, data_dir, num_runs, seed = args
+    t0 = time.time()
+    print(f"  >> {pdb_id}", flush=True)
     warnings.filterwarnings("ignore")
     try:
         from molcalib.prior import prepare_reference_template
@@ -36,8 +39,10 @@ def _mira_symrmsd_worker(args):
         ca_coords = load_protein_ca_coords(pdb_id, data_dir)
         template_mol, rot_bonds = prepare_reference_template(crystal_mol)
     except Exception as exc:
+        print(f"  << {pdb_id} load error ({time.time()-t0:.1f}s): {exc}", flush=True)
         return pdb_id, float("nan"), f"load error: {exc}"
     if len(samples) < 2:
+        print(f"  << {pdb_id} skip: too few samples ({time.time()-t0:.1f}s)", flush=True)
         return pdb_id, float("nan"), "too few samples"
     try:
         rng = np.random.default_rng(seed)
@@ -46,8 +51,10 @@ def _mira_symrmsd_worker(args):
             template_mol, rot_bonds, ca_coords,
             num_runs=num_runs, rng=rng,
         )
+        print(f"  << {pdb_id} score={score:.4f} ({time.time()-t0:.1f}s)", flush=True)
         return pdb_id, score, None
     except Exception as exc:
+        print(f"  << {pdb_id} compute error ({time.time()-t0:.1f}s): {exc}", flush=True)
         return pdb_id, float("nan"), f"compute error: {exc}"
 
 

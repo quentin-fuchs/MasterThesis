@@ -98,14 +98,13 @@ def mira_score(
     if rng is None:
         rng = np.random.default_rng()
 
-    all_targets = [crystal_coords] + list(sample_coords)  # length 1+S
-
     scores = []
     for _ in range(num_runs):
         c_coords = generate_reference_coords(template_mol, rot_bonds, ca_coords, rng)
-        all_dists = compute_rmsd_symmetry(crystal_mol, c_coords, all_targets, timeout=timeout)
-        d_crystal = all_dists[0]
-        d_samples = all_dists[1:]
+        d_crystal = compute_rmsd_symmetry(crystal_mol, c_coords, [crystal_coords], timeout=timeout)[0]
+        if not np.isfinite(d_crystal):
+            continue
+        d_samples = compute_rmsd_symmetry(crystal_mol, c_coords, sample_coords, timeout=timeout)
 
         yr_idx = int(rng.integers(S))
         r = d_samples[yr_idx]
