@@ -4,7 +4,7 @@ Shared HPC, data, and project-wide guidance is in `../CLAUDE.md` (loaded automat
 
 ## Project overview
 
-Fork of DiffDock (diffusion-based molecular docking), used for Quentin's MPhil thesis. The goal is to understand and extend DiffDock's inference behaviour — generating, visualising, and analysing predicted ligand poses. The end goal is applying the PQMass framework to test whether DiffDock's output distribution is well-captured, potentially using energy simulation as a ground-truth distribution.
+Fork of DiffDock (diffusion-based molecular docking), used for Quentin's MPhil thesis. The goal is to understand and evaluate DiffDock's inference behaviour — generating predicted ligand poses and assessing calibration using the TARP and MIRA metrics.
 
 - Working directory: `/home/qf226/MProject/DiffDock`
 - Conda environment: `diffdock`
