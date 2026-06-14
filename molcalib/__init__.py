@@ -22,7 +22,6 @@ MIRA:
 TARP:
     tarp_fractions            — K coverage fractions for a single complex
     ecp_from_fractions        — ECP curve from fraction matrix
-    atc_score                 — area-under-TARP-curve
     bootstrap_ecp             — bootstrap confidence bands
     plot_ecp                  — plot ECP with calibration diagonal
 
@@ -48,7 +47,6 @@ from molcalib.mira import (
 from molcalib.tarp import (
     tarp_fractions,
     ecp_from_fractions,
-    atc_score,
     bootstrap_ecp,
     plot_ecp,
 )
@@ -68,7 +66,6 @@ __all__ = [
     "bootstrap_mira_groups",
     "tarp_fractions",
     "ecp_from_fractions",
-    "atc_score",
     "bootstrap_ecp",
     "plot_ecp",
     "load_ligand_sdf",

@@ -33,8 +33,6 @@ from molcalib.prior import generate_reference_coords
 
 warnings.filterwarnings("ignore")
 
-_trapz = getattr(np, "trapezoid", np.trapz)
-
 
 def tarp_fractions(
     crystal_mol,
@@ -110,21 +108,6 @@ def ecp_from_fractions(f_matrix, n_bins=50):
     alpha = np.linspace(0, 1, n_bins)
     ecp = np.array([(f_flat <= a).mean() for a in alpha])
     return ecp, alpha
-
-
-def atc_score(ecp, alpha):
-    """Area-under-TARP-Curve: integral of (ECP(α) - α) over [0,1].
-
-    Positive → over-dispersed; negative → mode-collapsed; zero → calibrated.
-
-    Args:
-        ecp: numpy array of ECP values (shape n_bins).
-        alpha: numpy array of credibility levels (shape n_bins).
-
-    Returns:
-        Scalar ATC value.
-    """
-    return float(np.trapz(ecp - alpha, alpha))
 
 
 def bootstrap_ecp(f_matrix, n_bins=50, n_bootstrap=500, rng=None):
