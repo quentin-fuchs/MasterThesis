@@ -47,10 +47,10 @@ out_mira_names  = f"{METRICS}/mira_names_rmsd.npy"
 if os.path.exists(out_mira_scores):
     print("MIRA scores already exist, skipping.")
 else:
-    print("\nRunning MIRA (metric=symrmsd, num_runs=100) ...")
+    print(f"\nRunning MIRA (metric=symrmsd, num_runs=100, n_workers={N_WORKERS}) ...")
     mira_names, mira_scores = compute_mira_scores(
         complex_names, results_index, DATA_DIR,
-        num_runs=100, verbose=True, metric="symrmsd",
+        num_runs=100, verbose=True, metric="symrmsd", n_workers=N_WORKERS,
     )
     np.save(out_mira_names,  mira_names)
     np.save(out_mira_scores, mira_scores)
