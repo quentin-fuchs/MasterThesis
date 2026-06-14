@@ -8,21 +8,14 @@ existing PDBBind metrics (top1_rmsd.npy, rmsds.npy).
 
 Typical usage
 -------------
->>> from utils.rmsd_eval import run_rmsd_eval
+>>> from eval_diffdock.rmsd_runner import run_rmsd_eval
 >>> names, top1, all_rmsds = run_rmsd_eval(complex_names, results_index, data_dir)
 >>> print(f"Top-1 < 2Å: {(top1 < 2).mean() * 100:.1f}%")
 """
 
-import sys
 import warnings
-from pathlib import Path
 
 import numpy as np
-
-# eval_diffdock is in the thesis root (not pip-installed)
-_THESIS_ROOT = Path(__file__).resolve().parent.parent.parent
-if str(_THESIS_ROOT) not in sys.path:
-    sys.path.insert(0, str(_THESIS_ROOT))
 
 from eval_diffdock.loader import load_crystal_coords, load_sample_coords
 from molcalib import compute_rmsd_symmetry_multi

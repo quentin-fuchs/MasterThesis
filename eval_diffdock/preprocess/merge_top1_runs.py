@@ -12,7 +12,7 @@ rank*.sdf files are linked; rank*_confidence*.sdf files are excluded so
 load_sample_coords() does not load duplicate coordinates.
 
 Usage:
-    python utils/merge_top1_runs.py --runs_dir <path/to/runs> --out_prefix <path/prefix>
+    python eval_diffdock/preprocess/merge_top1_runs.py --runs_dir <path/to/runs> --out_prefix <path/prefix>
 
 Defaults (backwards-compatible):
     --runs_dir    <diffdock_dir>/results/top1_runs
@@ -22,7 +22,7 @@ Defaults (backwards-compatible):
 import argparse
 from pathlib import Path
 
-DIFFDOCK_DIR = Path(__file__).resolve().parents[1]
+DIFFDOCK_DIR = Path(__file__).resolve().parents[2] / "diffdock"
 N_RUNS = 10
 
 

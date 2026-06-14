@@ -10,13 +10,14 @@ Both the torsion cache (score model) and the allatoms cache (confidence model)
 are merged. Run directly on the login node — no GPU needed.
 
 Usage:
-    python utils/merge_chunk_caches.py
+    python eval_diffdock/preprocess/merge_chunk_caches.py
 """
 
 import os
 import pickle
+from pathlib import Path
 
-DIFFDOCK_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DIFFDOCK_DIR = str(Path(__file__).resolve().parents[2] / "diffdock")
 
 TORSION_BASE = os.path.join(DIFFDOCK_DIR, "data/cache_torsion")
 ALLATOMS_BASE = os.path.join(DIFFDOCK_DIR, "data/cache_torsion_allatoms")

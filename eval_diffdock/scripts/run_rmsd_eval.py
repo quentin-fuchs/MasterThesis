@@ -22,18 +22,11 @@ python analysis/run_rmsd_eval.py \
 
 import argparse
 import os
-import sys
 from pathlib import Path
 
 import numpy as np
 
-_DIFFDOCK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_THESIS   = os.path.dirname(_DIFFDOCK)
-for _p in (_DIFFDOCK, _THESIS):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
-
-from utils.rmsd_eval import run_rmsd_eval
+from eval_diffdock.rmsd_runner import run_rmsd_eval
 from eval_diffdock.loader import build_results_index
 
 

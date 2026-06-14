@@ -7,10 +7,10 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=8G
 #SBATCH --time=00:30:00
-#SBATCH --output=/home/qf226/MProject/DiffDock/logs/merge_pb_chunks_%j.out
-#SBATCH --error=/home/qf226/MProject/DiffDock/logs/merge_pb_chunks_%j.err
+#SBATCH --output=/home/qf226/MProject/thesis/logs/merge_pb_chunks_%j.out
+#SBATCH --error=/home/qf226/MProject/thesis/logs/merge_pb_chunks_%j.err
 
-DIFFDOCK_DIR=/home/qf226/MProject/DiffDock
+THESIS_DIR=/home/qf226/MProject/thesis
 RDS_RESULTS=/home/qf226/rds/hpc-work/results
 CHUNKS_DIR=$RDS_RESULTS/pb_evaluate_v2
 OUT_DIR=$RDS_RESULTS/pb_evaluate_v2_merged
@@ -18,7 +18,7 @@ OUT_DIR=$RDS_RESULTS/pb_evaluate_v2_merged
 source ~/.bashrc
 conda activate diffdock
 
-cd "$DIFFDOCK_DIR"
+cd "$THESIS_DIR"
 
 # Expose chunk_failed to the merge script as chunk_5
 # (chunk_extra120 is excluded — it belongs to a separate 428-complex investigation)
@@ -31,7 +31,7 @@ for i in 0 1 2 3 4 5; do
     ln -s "$CHUNKS_DIR/chunk_$i" "$STAGE/chunk_$i"
 done
 
-python merge_eval_chunks.py "$STAGE" "$OUT_DIR"
+python eval_diffdock/scripts/merge_eval_chunks.py "$STAGE" "$OUT_DIR"
 
 rm -rf "$STAGE"
 rm -f "$CHUNKS_DIR/chunk_5"
