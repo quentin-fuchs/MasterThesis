@@ -100,6 +100,32 @@ def load_crystal_coords(pdb_id, data_dir):
     raise FileNotFoundError(f"No readable ligand file for {pdb_id} in {data_dir}")
 
 
+def get_rank_files(complex_dir):
+    """Return sorted rank*.sdf paths from a complex directory.
+
+    Handles two naming conventions produced by DiffDock:
+    - Plain: rank1.sdf, rank2.sdf, ...  (preferred when >1 present)
+    - Confidence-tagged: rank1_confidence-1.23.sdf, ...
+
+    Args:
+        complex_dir: Path to the per-complex directory containing rank*.sdf files.
+
+    Returns:
+        Sorted list of Path objects.
+    """
+    plain = [f for f in complex_dir.iterdir()
+             if f.name.startswith("rank") and f.name.endswith(".sdf")
+             and "_confidence" not in f.name]
+    if len(plain) > 1:
+        return sorted(plain, key=lambda f: int(f.stem.replace("rank", "")))
+    return sorted(
+        [f for f in complex_dir.iterdir()
+         if f.name.startswith("rank") and "_confidence" in f.name
+         and f.name.endswith(".sdf")],
+        key=lambda f: int(f.name.split("_confidence")[0].replace("rank", "")),
+    )
+
+
 def load_sample_coords(pdb_id, results_index):
     """Load DiffDock predicted heavy-atom coordinates from rank*.sdf files.
 
@@ -112,19 +138,7 @@ def load_sample_coords(pdb_id, results_index):
         if some rank files contain NaN coordinates.
     """
     complex_dir = results_index[pdb_id]
-
-    plain = [f for f in complex_dir.iterdir()
-             if f.name.startswith("rank") and f.name.endswith(".sdf")
-             and "_confidence" not in f.name]
-    if len(plain) > 1:
-        rank_files = sorted(plain, key=lambda f: int(f.stem.replace("rank", "")))
-    else:
-        rank_files = sorted(
-            [f for f in complex_dir.iterdir()
-             if f.name.startswith("rank") and "_confidence" in f.name
-             and f.name.endswith(".sdf")],
-            key=lambda f: int(f.name.split("_confidence")[0].replace("rank", ""))
-        )
+    rank_files = get_rank_files(complex_dir)
 
     coords_list = []
     for sdf_file in rank_files:

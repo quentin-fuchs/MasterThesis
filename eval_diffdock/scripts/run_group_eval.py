@@ -1,6 +1,6 @@
 """
-Compute per-group (translation / rotation / torsion) TARP fractions and raw
-group distances for the DiffDock PDBBind or PoseBusters test sets.
+Compute per-group (translation / rotation / torsion) TARP fractions, raw group
+distances, and MIRA scores for the DiffDock PDBBind or PoseBusters test sets.
 
 Saves to --out_dir:
   tarp_fractions_translation.npy  (n_complexes, K)
@@ -9,76 +9,45 @@ Saves to --out_dir:
   distances_translation.npy       (n_complexes, S)   Å
   distances_rotation.npy          (n_complexes, S)   rad
   distances_torsion_rms.npy       (n_complexes, S)   rad
+  mira_scores_{translation,rotation,torsion}.npy  (n_valid,)
+  mira_names_{translation,rotation,torsion}.npy   (n_valid,)
   complex_names.npy               (n_complexes,)
   n_rot_bonds.npy                 (n_complexes,)     int
 
 Usage
 -----
 PDBBind test set:
-  python analysis/run_group_eval.py \
+  python eval_diffdock/scripts/run_group_eval.py \
       --complex_names_npy /home/qf226/rds/results/pdbbind_testset/metrics/complex_names.npy \
       --results_dir       /home/qf226/rds/results/pdbbind_testset/poses \
       --data_dir          data/PDBBind_processed \
       --out_dir           /home/qf226/rds/results/pdbbind_testset/metrics/group_eval \
-      --K 100 --n_workers 8
+      --K 100 --num_runs 100 --n_workers 8
 
 PoseBusters benchmark:
-  python analysis/run_group_eval.py \
+  python eval_diffdock/scripts/run_group_eval.py \
       --complex_names_npy results/posebusters_inference/metrics/complex_names.npy \
       --results_dir       results/posebusters_inference \
       --data_dir          data/posebusters_benchmark_set \
       --out_dir           results/posebusters_inference/metrics/group_eval \
-      --K 100 --n_workers 8
+      --K 100 --num_runs 100 --n_workers 8
 """
 
 import argparse
 import os
-import sys
 import time
 
 import numpy as np
 
-# Make diffdock/ and thesis/ importable when invoked from analysis/
-_DIFFDOCK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_THESIS   = os.path.dirname(_DIFFDOCK)
-for _p in (_DIFFDOCK, _THESIS):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
-
 from eval_diffdock.loader import build_results_index
 from eval_diffdock.group_tarp_runner import run_group_tarp_eval, run_group_distances
-
-
-def _build_flat_index(results_dir):
-    """Build results index from either a flat or chunked directory layout.
-
-    PoseBusters inference results are stored in a flat directory (one
-    subdir per complex at the top level), whereas PDBBind results use the
-    chunk_0 / chunk_1 / ... layout produced by evaluate.py.
-
-    Args:
-        results_dir: path to the top-level results directory.
-
-    Returns:
-        dict mapping pdb_id (str) → Path of the complex subdirectory.
-    """
-    from pathlib import Path
-    p = Path(results_dir)
-    # Try the chunked layout first
-    chunks = sorted(p.glob("chunk_*"))
-    if chunks:
-        return build_results_index(str(results_dir))
-    # Fall back to flat layout
-    index = {}
-    for d in p.iterdir():
-        if d.is_dir():
-            index[d.name] = d
-    return index
+from eval_diffdock.group_mira_runner import run_group_mira_eval
+from molcalib.mira import mira_null
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Per-group TARP and distance evaluation for DiffDock."
+        description="Per-group TARP, distance, and MIRA evaluation for DiffDock."
     )
     parser.add_argument(
         "--complex_names_npy", required=True,
@@ -122,6 +91,14 @@ def main():
         "--skip_tarp", action="store_true",
         help="Skip TARP computation (only compute raw distances).",
     )
+    parser.add_argument(
+        "--num_runs", type=int, default=100,
+        help="Monte Carlo center draws per complex per group for MIRA (default: 100).",
+    )
+    parser.add_argument(
+        "--skip_mira", action="store_true",
+        help="Skip group MIRA computation.",
+    )
     args = parser.parse_args()
 
     os.makedirs(args.out_dir, exist_ok=True)
@@ -130,8 +107,8 @@ def main():
     complex_names = np.load(args.complex_names_npy, allow_pickle=True)
     print(f"Loaded {len(complex_names)} complex names from {args.complex_names_npy}")
 
-    # Build results index
-    results_index = _build_flat_index(args.results_dir)
+    # Build results index (handles both flat and chunk_* layouts)
+    results_index = build_results_index(args.results_dir)
     print(f"Results index: {len(results_index)} entries from {args.results_dir}")
 
     # Filter to complexes present in the results index
@@ -199,6 +176,43 @@ def main():
         np.save(os.path.join(args.out_dir, "n_rot_bonds_tarp.npy"),
                 tarp_results["n_rot_bonds"])
         print(f"  Saved complex names ({len(tarp_results['names'])}) to {args.out_dir}")
+
+    # --- Per-group MIRA scores ---
+    if not args.skip_mira:
+        already = all(
+            os.path.exists(os.path.join(args.out_dir, f"mira_scores_{g}.npy"))
+            for g in ("translation", "rotation", "torsion")
+        )
+        if already:
+            print("\n=== Group MIRA output files already exist, skipping ===")
+        else:
+            print("\n=== Computing per-group MIRA scores ===")
+            t0 = time.time()
+            mira_results = run_group_mira_eval(
+                complex_names,
+                results_index,
+                args.data_dir,
+                num_runs=args.num_runs,
+                seed=args.seed,
+                verbose=True,
+                n_workers=args.n_workers,
+                max_samples=args.max_samples,
+            )
+            elapsed = time.time() - t0
+            print(f"  Done in {elapsed:.1f}s.")
+
+            null = mira_null(args.max_samples or 40)
+            print(f"\nNull reference (S={args.max_samples or 40}): {null:.4f}\n")
+            for g in ("translation", "rotation", "torsion"):
+                names, scores = mira_results[g]
+                np.save(os.path.join(args.out_dir, f"mira_scores_{g}.npy"), scores)
+                np.save(os.path.join(args.out_dir, f"mira_names_{g}.npy"), names)
+                if len(scores):
+                    print(f"  {g:12s}: n={len(scores):4d}  "
+                          f"mean={scores.mean():.4f}  "
+                          f"deviation from null={scores.mean()-null:+.4f}")
+                else:
+                    print(f"  {g:12s}: no valid complexes.")
 
     print("\nAll done.")
 

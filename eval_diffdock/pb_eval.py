@@ -15,6 +15,8 @@ from pathlib import Path
 import numpy as np
 from rdkit import Chem
 
+from eval_diffdock.loader import get_rank_files
+
 warnings.filterwarnings("ignore")
 
 
@@ -88,19 +90,7 @@ def run_posebusters(
             skipped += 1
             continue
 
-        plain = [f for f in complex_dir.iterdir()
-                 if f.name.startswith("rank") and f.name.endswith(".sdf")
-                 and "_confidence" not in f.name]
-        if len(plain) > 1:
-            rank_files = sorted(plain, key=lambda f: int(f.stem.replace("rank", "")))
-        else:
-            rank_files = sorted(
-                [f for f in complex_dir.iterdir()
-                 if f.name.startswith("rank") and "_confidence" in f.name
-                 and f.name.endswith(".sdf")],
-                key=lambda f: int(f.name.split("_confidence")[0].replace("rank", "")),
-            )
-
+        rank_files = get_rank_files(complex_dir)
         if not rank_files:
             skipped += 1
             continue

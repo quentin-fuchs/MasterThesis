@@ -57,7 +57,7 @@ def compute_mira_scores(
     data_dir,
     num_runs=20,
     verbose=True,
-    metric="euclidean",
+    metric="symrmsd",
     seed=42,
     n_workers=1,
 ):

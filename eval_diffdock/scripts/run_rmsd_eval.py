@@ -30,14 +30,6 @@ from eval_diffdock.rmsd_runner import run_rmsd_eval
 from eval_diffdock.loader import build_results_index
 
 
-def build_flat_index(results_dir):
-    return {
-        d.name: d
-        for d in sorted(Path(results_dir).iterdir())
-        if d.is_dir() and any(d.glob("rank*.sdf"))
-    }
-
-
 def main():
     parser = argparse.ArgumentParser(description="Compute DiffDock RMSD accuracy metrics.")
     parser.add_argument("--results_dir", required=True,
@@ -53,14 +45,8 @@ def main():
     os.makedirs(args.out_dir, exist_ok=True)
 
     # Auto-detect flat vs chunk_* structure
-    results_path = Path(args.results_dir)
-    has_chunks = any(d.name.startswith("chunk_") for d in results_path.iterdir() if d.is_dir())
-    if has_chunks:
-        results_index = build_results_index(args.results_dir)
-        print(f"Detected chunk_* structure: {len(results_index)} complexes")
-    else:
-        results_index = build_flat_index(args.results_dir)
-        print(f"Detected flat structure: {len(results_index)} complexes")
+    results_index = build_results_index(args.results_dir)
+    print(f"Results index: {len(results_index)} complexes")
 
     complex_names = sorted(results_index.keys())
 

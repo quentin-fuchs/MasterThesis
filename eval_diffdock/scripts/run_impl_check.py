@@ -35,11 +35,9 @@ warnings.filterwarnings("ignore")
 # thesis/   → molcalib + eval_diffdock (pip-installed or on PYTHONPATH)
 # thesis/diffdock/   → group_eval / group_mira_eval (need explicit path)
 
-THESIS_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DIFFDOCK_DIR = os.path.join(THESIS_DIR, "diffdock")
-for p in [THESIS_DIR, DIFFDOCK_DIR]:
-    if p not in sys.path:
-        sys.path.insert(0, p)
+THESIS_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if THESIS_DIR not in sys.path:
+    sys.path.insert(0, THESIS_DIR)
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 RDS          = "/home/qf226/rds/hpc-work"
@@ -79,9 +77,8 @@ from eval_diffdock.loader import build_results_index
 from eval_diffdock.mira_runner import compute_mira_scores
 from eval_diffdock.tarp_runner import run_tarp_eval
 
-# Per-DOF runners live in the diffdock subtree (import after adding DIFFDOCK_DIR)
-from utils.group_eval import run_group_tarp_eval
-from utils.group_mira_eval import run_group_mira_eval
+from eval_diffdock.group_tarp_runner import run_group_tarp_eval, run_group_distances
+from eval_diffdock.group_mira_runner import run_group_mira_eval
 
 # ── Load complex names ────────────────────────────────────────────────────────
 complex_names_all = np.load(os.path.join(METRICS_DIR, "complex_names.npy"),
