@@ -35,9 +35,9 @@ SENS_ROOT    = RDS / "results/DiffDock/sensitivity_ode_nsteps_v2"
 
 CONDITIONS = {
     "sde_20": BASELINE_DIR,
-    "sde_10": SENS_ROOT / "sde_10",
-    "sde_50": SENS_ROOT / "sde_50",
-    "ode_20": SENS_ROOT / "ode_20",
+    "sde_10": SENS_ROOT / "sde_10" / "poses",
+    "sde_50": SENS_ROOT / "sde_50" / "poses",
+    "ode_20": SENS_ROOT / "ode_20" / "poses",
 }
 
 sys.path.insert(0, str(THESIS_DIR))

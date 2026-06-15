@@ -44,7 +44,7 @@ python evaluate.py \
     --data_dir $RDS/data/posebusters_benchmark_set \
     --split_path data/splits/pb_sensitivity_failed12.txt \
     --cache_path $RDS/data/cache_pb_rebuild \
-    --out_dir "$OUT_ROOT/$COND" \
+    --out_dir "$OUT_ROOT/$COND/poses" \
     --esm_embeddings_path $RDS/data/embeddings/posebusters_esm2_failed.pt \
     --samples_per_complex 40 \
     --batch_size 40 \

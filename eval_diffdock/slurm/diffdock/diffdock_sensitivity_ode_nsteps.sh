@@ -46,7 +46,7 @@ export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"
 export PYTHONPATH="$DIFFDOCK_DIR:$PYTHONPATH"
 
 cd "$DIFFDOCK_DIR"
-mkdir -p logs "$OUT_ROOT/$COND"
+mkdir -p logs "$OUT_ROOT/$COND/poses"
 
 python evaluate.py \
     --config configs/sensitivity_inference_args.yaml \
@@ -54,7 +54,7 @@ python evaluate.py \
     --data_dir $RDS/data/posebusters_benchmark_set \
     --split_path data/splits/pb_sensitivity_rand100.txt \
     --cache_path $RDS/data/cache_pb_rebuild \
-    --out_dir "$OUT_ROOT/$COND" \
+    --out_dir "$OUT_ROOT/$COND/poses" \
     --esm_embeddings_path $RDS/data/embeddings/posebusters_esm2.pt \
     --samples_per_complex 40 \
     --batch_size 40 \

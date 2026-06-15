@@ -27,11 +27,11 @@ N_WORKERS=14
 CONDS=(sde_10 sde_20 sde_50 ode_20)
 COND=${CONDS[$SLURM_ARRAY_TASK_ID]}
 
-RESULTS_DIR=$SENS_ROOT/$COND
-OUT_DIR=$RESULTS_DIR/metrics
+POSES_DIR=$SENS_ROOT/$COND/poses
+OUT_DIR=$SENS_ROOT/$COND/metrics
 
 echo "Condition: $COND"
-echo "Results:   $RESULTS_DIR"
+echo "Poses:     $POSES_DIR"
 echo "Metrics:   $OUT_DIR"
 
 source ~/.bashrc
@@ -45,7 +45,7 @@ mkdir -p "$OUT_DIR"
 echo ""
 echo "=== RMSD eval (rmsds.npy, top1_rmsd.npy) ==="
 python analysis/run_rmsd_eval.py \
-    --results_dir "$RESULTS_DIR" \
+    --results_dir "$POSES_DIR" \
     --data_dir    "$DATA_DIR" \
     --out_dir     "$OUT_DIR" \
     --max_samples 40
@@ -61,7 +61,7 @@ from pathlib import Path
 from utils.tarp_eval import run_tarp_eval, ecp_from_fractions
 from utils.mira_eval import compute_mira_scores, mira_null
 
-RESULTS_DIR = "$RESULTS_DIR"
+RESULTS_DIR = "$POSES_DIR"
 DATA_DIR    = "$DATA_DIR"
 OUT_DIR     = "$OUT_DIR"
 N_WORKERS   = $N_WORKERS

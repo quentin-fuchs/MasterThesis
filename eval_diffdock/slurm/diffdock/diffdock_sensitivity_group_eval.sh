@@ -29,11 +29,11 @@ WHITELIST=$DIFFDOCK_DIR/data/splits/pb_sensitivity_rand100.txt
 CONDS=(sde_10 sde_20 sde_50 ode_20)
 COND=${CONDS[$SLURM_ARRAY_TASK_ID]}
 
-RESULTS_DIR=$SENS_ROOT/$COND
-OUT_DIR=$RESULTS_DIR/metrics/group_eval
+POSES_DIR=$SENS_ROOT/$COND/poses
+OUT_DIR=$SENS_ROOT/$COND/metrics/group_eval
 
 echo "Condition: $COND"
-echo "Results:   $RESULTS_DIR"
+echo "Poses:     $POSES_DIR"
 echo "Output:    $OUT_DIR"
 
 source ~/.bashrc
@@ -57,7 +57,7 @@ echo ""
 echo "=== Per-group TARP + distances ==="
 python analysis/run_group_eval.py \
     --complex_names_npy "$NAMES_NPY" \
-    --results_dir       "$RESULTS_DIR" \
+    --results_dir       "$POSES_DIR" \
     --data_dir          "$DATA_DIR" \
     --out_dir           "$OUT_DIR" \
     --K 100 \
@@ -68,7 +68,7 @@ echo ""
 echo "=== Per-group MIRA ==="
 python analysis/run_group_mira.py \
     --complex_names_npy "$NAMES_NPY" \
-    --results_dir       "$RESULTS_DIR" \
+    --results_dir       "$POSES_DIR" \
     --data_dir          "$DATA_DIR" \
     --out_dir           "$OUT_DIR" \
     --num_runs 100 \

@@ -14,7 +14,7 @@ RDS          = Path("/home/qf226/rds/hpc-work")
 
 WHITELIST = DIFFDOCK_DIR / "data/splits/pb_sensitivity_rand100.txt"
 SRC_DIR   = RDS / "results/DiffDock/pb_evaluate_v2_merged/poses"
-DST_DIR   = RDS / "results/DiffDock/sensitivity_ode_nsteps_v2/sde_20"
+DST_DIR   = RDS / "results/DiffDock/sensitivity_ode_nsteps_v2/sde_20/poses"
 
 DST_DIR.mkdir(parents=True, exist_ok=True)
 

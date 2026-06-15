@@ -42,7 +42,7 @@ python evaluate.py \
     --data_dir $RDS/data/posebusters_benchmark_set \
     --split_path data/splits/pb_sensitivity_rand100.txt \
     --cache_path $RDS/data/cache_pb_rebuild \
-    --out_dir "$OUT_ROOT/ode_20" \
+    --out_dir "$OUT_ROOT/ode_20/poses" \
     --esm_embeddings_path $RDS/data/embeddings/posebusters_esm2.pt \
     --samples_per_complex 40 \
     --batch_size 40 \
