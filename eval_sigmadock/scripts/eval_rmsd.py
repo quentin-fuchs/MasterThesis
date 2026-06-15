@@ -22,7 +22,7 @@ from pathlib import Path
 
 import torch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "sigmadock" / "src"))
 
 from sigmadock.chem.statistics import (
     collect_posebusters,

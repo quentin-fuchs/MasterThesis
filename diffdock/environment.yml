@@ -41,15 +41,7 @@ dependencies:
     - gradio==3.50.*
     - requests
 
-    #New dependencies for visualization and notebooks
-    - ipykernel
-    - py3Dmol==2.5.4
-    - jupyterlab==4.5.7
-
-    # Experiment tracking
+    # Experiment tracking (needed in evaluate.py and training)
     - wandb==0.26.1
 
-    #Diffdock evaluation
-    - tarp==0.1.1
-    - mira-score==0.1.7
-    #- posebusters==0.6.5
+    

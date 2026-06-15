@@ -32,8 +32,8 @@ import torch
 warnings.filterwarnings("ignore")
 
 _HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(_HERE.parent / "src"))
-sys.path.insert(0, str(_HERE.parents[1] / "DiffDock"))
+sys.path.insert(0, str(_HERE.parents[2] / "sigmadock" / "src"))
+sys.path.insert(0, str(_HERE.parents[3] / "DiffDock"))
 
 from sigmadock.chem.statistics import get_mol_from_coords
 from utils.tarp_eval import load_protein_ca_coords

@@ -56,11 +56,7 @@ test = [
     "spyrmsd",
     "pytest-cov"
 ]
-mira_analysis = [
-    "mira-score==0.1.7",
-    "tarp==0.1.1",
-    "prody",
-]
+
 
 # Script Entrypoints
 [project.scripts]
