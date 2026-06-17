@@ -35,11 +35,8 @@ from copy import deepcopy
 
 from rdkit.Chem import Conformer
 
-_HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(_HERE.parents[3] / "DiffDock"))
-
-from utils.tarp_eval import load_protein_ca_coords
-from utils.group_eval import (
+from eval_diffdock.loader import load_protein_ca_coords
+from eval_diffdock.group_tarp_runner import (
     get_rotatable_bonds,
     _kabsch_rotation,
     _geodesic_angle,
@@ -51,12 +48,12 @@ from utils.group_eval import (
     compute_tarp_fractions_rotation,
     compute_tarp_fractions_torsion,
 )
-from utils.group_mira_eval import (
-    mira_null,
+from eval_diffdock.group_mira_runner import (
     _mira_score_translation,
     _mira_score_rotation,
     _mira_score_torsion,
 )
+from molcalib.mira import mira_null
 
 
 def _get_mol_from_coords(coords, ref_mol):
