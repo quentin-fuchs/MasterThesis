@@ -31,11 +31,13 @@ import torch
 
 warnings.filterwarnings("ignore")
 
+from copy import deepcopy
+
+from rdkit.Chem import Conformer
+
 _HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(_HERE.parents[2] / "sigmadock" / "src"))
 sys.path.insert(0, str(_HERE.parents[3] / "DiffDock"))
 
-from sigmadock.chem.statistics import get_mol_from_coords
 from utils.tarp_eval import load_protein_ca_coords
 from utils.group_eval import (
     get_rotatable_bonds,
@@ -55,6 +57,16 @@ from utils.group_mira_eval import (
     _mira_score_rotation,
     _mira_score_torsion,
 )
+
+
+def _get_mol_from_coords(coords, ref_mol):
+    mol = deepcopy(ref_mol)
+    mol.RemoveAllConformers()
+    conf = Conformer(mol.GetNumAtoms())
+    for i, (x, y, z) in enumerate(coords.tolist()):
+        conf.SetAtomPosition(i, (x, y, z))
+    mol.AddConformer(conf)
+    return mol
 
 
 def load_sigmadock_poses(model_dir: Path) -> dict:
@@ -83,7 +95,7 @@ def load_sigmadock_poses(model_dir: Path) -> dict:
             sample  = samples[0]
             lig_ref = sample["lig_ref"]
             x0_hat  = sample["x0_hat"]
-            pred_mol = get_mol_from_coords(x0_hat, lig_ref)
+            pred_mol = _get_mol_from_coords(x0_hat, lig_ref)
             coords   = pred_mol.GetConformer().GetPositions()
 
             if complex_id not in poses:
@@ -197,7 +209,7 @@ def _process_complex(cid, lig_ref, sample_coords_list, data_dir, K, num_runs, rn
 
 def main(args):
     model_dir = Path(args.results_dir)
-    out_dir   = model_dir / "group_eval"
+    out_dir   = Path(args.output_dir) if args.output_dir else model_dir / "group_eval"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Loading poses from {model_dir} ...", flush=True)
@@ -293,5 +305,7 @@ if __name__ == "__main__":
                     help="TARP reference draws per complex (default 100)")
     ap.add_argument("--num-runs", type=int, default=100,
                     help="MIRA Monte Carlo draws per complex (default 100)")
-    ap.add_argument("--seed",     type=int, default=42)
+    ap.add_argument("--seed",       type=int, default=42)
+    ap.add_argument("--output-dir", default=None,
+                    help="Output directory for .npy files. Default: <results_dir>/group_eval")
     main(ap.parse_args())

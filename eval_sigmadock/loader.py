@@ -3,9 +3,21 @@
 Loads predicted poses from SigmaDock's seed_*/predictions.pt files.
 """
 
+from copy import deepcopy
 from pathlib import Path
 
 import torch
+from rdkit.Chem import Conformer
+
+
+def _get_mol_from_coords(coords, ref_mol):
+    mol = deepcopy(ref_mol)
+    mol.RemoveAllConformers()
+    conf = Conformer(mol.GetNumAtoms())
+    for i, (x, y, z) in enumerate(coords.tolist()):
+        conf.SetAtomPosition(i, (x, y, z))
+    mol.AddConformer(conf)
+    return mol
 
 
 def load_sigmadock_poses(model_dir):
@@ -21,8 +33,6 @@ def load_sigmadock_poses(model_dir):
     Raises:
         FileNotFoundError: if no seed_*/predictions.pt files are found.
     """
-    from sigmadock.chem.statistics import get_mol_from_coords
-
     model_dir = Path(model_dir)
     seed_dirs = sorted(
         [p for p in model_dir.glob("seed_*") if (p / "predictions.pt").exists()],
@@ -38,7 +48,7 @@ def load_sigmadock_poses(model_dir):
             sample = samples[0]
             lig_ref = sample["lig_ref"]
             x0_hat  = sample["x0_hat"]
-            pred_mol = get_mol_from_coords(x0_hat, lig_ref)
+            pred_mol = _get_mol_from_coords(x0_hat, lig_ref)
             coords   = pred_mol.GetConformer().GetPositions()
             if complex_id not in poses:
                 poses[complex_id]    = []
