@@ -46,6 +46,9 @@ env/
 *.svg
 *.pdf
 
+# DiffDock workdir (model weights, configs downloaded at first run)
+diffdock/workdir
+
 # SLURM scripts (keep in ~/slurm/ only; curate manually what goes in the repo)
 eval_diffdock/slurm/
 eval_sigmadock/slurm/

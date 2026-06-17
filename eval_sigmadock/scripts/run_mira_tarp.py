@@ -7,7 +7,7 @@ Args (CLI):
     results_dir:     model directory containing seed_*/predictions.pt
     --data-dir:      PoseBusters dataset root (required for TARP and symRMSD MIRA)
     --metric:        MIRA distance metric: euclidean, rmsd, or symrmsd
-    --num-runs:      MIRA Monte Carlo draws per complex (default 20)
+    --num-runs:      MIRA Monte Carlo draws per complex (default 100)
     --K:             TARP reference draws per complex (default 20)
     --mode:          TARP distance: centroid (fast) or rmsd
     --n-bootstrap:   ECP bootstrap replicates (default 200)
@@ -229,7 +229,7 @@ if __name__ == "__main__":
     parser.add_argument("--data-dir", default=None)
     parser.add_argument("--metric", choices=["euclidean", "rmsd", "symrmsd"],
                         default="euclidean")
-    parser.add_argument("--num-runs", type=int, default=20)
+    parser.add_argument("--num-runs", type=int, default=100)
     parser.add_argument("--K", type=int, default=20)
     parser.add_argument("--mode", choices=["centroid", "rmsd"], default="centroid")
     parser.add_argument("--n-bootstrap", type=int, default=200)

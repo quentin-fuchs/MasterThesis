@@ -23,7 +23,7 @@ from eval_diffdock.mira_runner import compute_mira_scores
 PB_DIR      = "/home/qf226/rds/hpc-work/results/DiffDock/pb_evaluate_v2_merged"
 RESULTS_DIR = os.path.join(PB_DIR, "poses")
 DATA_DIR    = "/home/qf226/rds/hpc-work/data/posebusters_benchmark_set"
-METRICS     = os.path.join(PB_DIR, "metrics")
+METRICS     = os.environ.get("METRICS_OUT", os.path.join(PB_DIR, "metrics"))
 
 N_WORKERS = int(os.environ.get("N_WORKERS", 1))
 

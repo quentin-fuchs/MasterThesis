@@ -1,0 +1,43 @@
+# analysis environment — MIRA/TARP calibration, PoseBusters filtering, Jupyter notebooks
+#
+# Purpose: everything needed to run eval_diffdock scripts, molcalib metrics, and
+#          the analysis notebooks. Intentionally separate from the DiffDock and
+#          SigmaDock inference envs so PoseBusters can never affect their rdkit.
+#
+# Create (from repo root):
+#   conda env create -f envs/analysis.yml
+#   conda run -n analysis pip install -e .
+#
+# Register Jupyter kernel:
+#   conda activate analysis
+#   python -m ipykernel install --user --name analysis --display-name "Python (analysis)"
+#
+# rdkit pin rationale: 2025.09.6 tested with PoseBusters 0.6.5. Do not upgrade
+# without re-testing SDF loading and symRMSD calculations. The DiffDock env uses
+# 2022.03.3; that version must never enter this env (and this env must never enter
+# the diffdock/sigmadock envs).
+
+name: analysis
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - rdkit==2025.09.6
+      - numpy>=1.24
+      - scipy>=1.10
+      - matplotlib>=3.7
+      - pandas>=2.0
+      - jupyter
+      - ipykernel
+      - notebook
+      - tqdm
+      - networkx
+      - prody>=2.4
+      - biopython
+      - spyrmsd==0.9.0
+      - posebusters==0.6.5
+      - --extra-index-url https://download.pytorch.org/whl/cpu
+      - torch
+      #py3Dmol might be needed 

@@ -174,3 +174,6 @@ temp6.py
 temp7.py
 esm
 
+
+# Symlink to DiffDock workdir (model weights, downloaded at first run)
+workdir
