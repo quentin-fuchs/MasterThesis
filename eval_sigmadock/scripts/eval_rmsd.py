@@ -181,7 +181,7 @@ def main(results_dir: str, scoring: str, output_dir: str | None) -> None:
 
         if best_r < 2.0:
             top1_pass_rmsd += 1
-            if best_passes and all(best_passes.get(c, False) for c in PB_PAPER_CHECKS):
+            if best_passes and all(v for v in best_passes.values()):
                 top1_pass_pb += 1
 
     print(f"\n=== Top-1 results | {S} seeds | {N} complexes ===")
