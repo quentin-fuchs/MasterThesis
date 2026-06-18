@@ -25,7 +25,7 @@ warnings.filterwarnings("ignore")
 
 from eval_sigmadock.loader import load_sigmadock_poses
 from molcalib.mira import mira_null, mira_score, _mira_euclidean
-from molcalib.tarp import tarp_fractions, ecp_from_fractions, bootstrap_ecp, plot_ecp, atc_score
+from molcalib.tarp import tarp_fractions, ecp_from_fractions, bootstrap_ecp, plot_ecp
 from molcalib.prior import prepare_reference_template
 
 
