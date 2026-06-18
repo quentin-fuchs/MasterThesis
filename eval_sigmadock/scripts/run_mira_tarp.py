@@ -189,8 +189,6 @@ def main(args):
         if f_matrix.shape[0] > 0:
             ecp, alpha = ecp_from_fractions(f_matrix)
             boot_ecps  = bootstrap_ecp(f_matrix, n_bootstrap=args.n_bootstrap)
-            print(f"\n  TARP AUC = {np.trapz(ecp, alpha):.4f}  (perfect = 0.5000)")
-
             import matplotlib.pyplot as plt
             fig, ax = plt.subplots(figsize=(5, 5))
             plot_ecp(ecp, alpha, ax=ax,
@@ -216,8 +214,6 @@ def main(args):
     delta = mira_scores.mean() - mira_null(S)
     print(f"  MIRA Δnull: {delta:+.4f}  "
           f"({'over-dispersed' if delta > 0 else 'mode-collapsed'})")
-    if f_matrix.shape[0] > 0:
-        print(f"  TARP AUC  : {np.trapz(ecp, alpha):.4f}  (perfect = 0.5000)")
     print("=" * 50)
 
 
