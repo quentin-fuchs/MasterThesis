@@ -11,8 +11,14 @@ Args (CLI):
     --K:             TARP reference draws per complex (default 20)
     --mode:          TARP distance: centroid (fast) or rmsd
     --n-bootstrap:   ECP bootstrap replicates (default 200)
-    --output:        output .npz path (default: <results_dir>/mira_tarp.npz)
-    --skip-mira:     skip MIRA and load scores from existing mira_tarp.npz
+    --out-dir:       output directory (default: <results_dir>/metrics)
+    --skip-mira:     skip MIRA and load scores from existing .npy files in --out-dir
+
+Outputs (saved as separate .npy files matching the DiffDock naming convention):
+    mira_names_{metric}.npy
+    mira_scores_{metric}.npy
+    tarp_fractions_{metric}_K{K}.npy
+    tarp_ecp_{metric}_K{K}.png
 """
 
 import argparse
@@ -129,11 +135,10 @@ def run_tarp(complex_data, data_dir, K=20, mode="centroid", seed=42):
         pdb_path = pdb_path_processed if os.path.exists(pdb_path_processed) else pdb_path_fallback
         try:
             ca_coords = _load_ca(pdb_path)
+            template_mol, rot_bonds = prepare_reference_template(lig_ref)
         except Exception as exc:
-            print(f"    Skipping {cid} (protein load): {exc}", flush=True)
+            print(f"    Skipping {cid} (setup): {exc}", flush=True)
             continue
-
-        template_mol, rot_bonds = prepare_reference_template(lig_ref)
         rng = np.random.default_rng(child_seeds[i])
         fracs = tarp_fractions(
             lig_ref, crystal, template_mol, rot_bonds,
@@ -156,8 +161,13 @@ def run_tarp(complex_data, data_dir, K=20, mode="centroid", seed=42):
 
 def main(args):
     model_dir = Path(args.results_dir)
-    out_path  = Path(args.output) if args.output else model_dir / "mira_tarp.npz"
-    plot_path = out_path.with_suffix(".png")
+    out_dir   = Path(args.out_dir) if args.out_dir else model_dir / "metrics"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    mira_names_path  = out_dir / f"mira_names_{args.metric}.npy"
+    mira_scores_path = out_dir / f"mira_scores_{args.metric}.npy"
+    tarp_fracs_path  = out_dir / f"tarp_fractions_{args.metric}_K{args.K}.npy"
+    tarp_plot_path   = out_dir / f"tarp_ecp_{args.metric}_K{args.K}.png"
 
     print(f"Loading poses from {model_dir} ...", flush=True)
     complex_data = load_sigmadock_poses(model_dir)
@@ -166,19 +176,17 @@ def main(args):
 
     if args.skip_mira:
         print("=== MIRA skipped (--skip-mira) ===")
-        existing = np.load(str(model_dir / "mira_tarp.npz"), allow_pickle=True)
-        mira_names  = existing["mira_names"]
-        mira_scores = existing["mira_scores"]
+        mira_names  = np.load(str(mira_names_path),  allow_pickle=True)
+        mira_scores = np.load(str(mira_scores_path), allow_pickle=True)
     else:
         print("=== MIRA ===")
         mira_names, mira_scores = run_mira(
             complex_data, num_runs=args.num_runs, metric=args.metric,
             seed=42, data_dir=args.data_dir,
         )
-
-    tarp_names = np.array([], dtype=object)
-    f_matrix   = np.empty((0, args.K))
-    ecp = alpha = boot_ecps = np.array([])
+        np.save(str(mira_names_path),  mira_names)
+        np.save(str(mira_scores_path), mira_scores)
+        print(f"  Saved → {mira_names_path.name}, {mira_scores_path.name}")
 
     if args.data_dir:
         print("\n=== TARP ===")
@@ -187,6 +195,8 @@ def main(args):
             K=args.K, mode=args.mode, seed=42,
         )
         if f_matrix.shape[0] > 0:
+            np.save(str(tarp_fracs_path), f_matrix)
+            print(f"  Saved → {tarp_fracs_path.name}")
             ecp, alpha = ecp_from_fractions(f_matrix)
             boot_ecps  = bootstrap_ecp(f_matrix, n_bootstrap=args.n_bootstrap)
             import matplotlib.pyplot as plt
@@ -196,17 +206,10 @@ def main(args):
                      bootstrap_ecps=boot_ecps)
             ax.set_title(f"TARP ECP — SigmaDock ({args.mode} mode)")
             fig.tight_layout()
-            fig.savefig(str(plot_path), dpi=150)
-            print(f"  ECP plot → {plot_path}")
+            fig.savefig(str(tarp_plot_path), dpi=150)
+            print(f"  ECP plot → {tarp_plot_path}")
     else:
         print("\n(TARP skipped — pass --data-dir to enable)")
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(str(out_path),
-             mira_names=mira_names, mira_scores=mira_scores,
-             tarp_names=tarp_names, tarp_f_matrix=f_matrix,
-             tarp_ecp=ecp, tarp_alpha=alpha, tarp_boot_ecps=boot_ecps)
-    print(f"\nResults → {out_path}")
 
     print("\n" + "=" * 50)
     print(f"  Complexes : {len(complex_data)}  |  Seeds : {S}")
@@ -229,6 +232,6 @@ if __name__ == "__main__":
     parser.add_argument("--K", type=int, default=20)
     parser.add_argument("--mode", choices=["centroid", "rmsd"], default="centroid")
     parser.add_argument("--n-bootstrap", type=int, default=200)
-    parser.add_argument("--output", default=None)
+    parser.add_argument("--out-dir", default=None)
     parser.add_argument("--skip-mira", action="store_true")
     main(parser.parse_args())

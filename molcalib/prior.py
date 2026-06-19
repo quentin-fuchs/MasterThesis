@@ -100,8 +100,8 @@ def _embed_etkdg(mol):
         failures += 1
     if cid == -1:
         ps.useRandomCoords = True
-        AllChem.EmbedMolecule(mol_h, ps)
-        AllChem.MMFFOptimizeMolecule(mol_h, confId=0)
+        if AllChem.EmbedMolecule(mol_h, ps) != -1:
+            AllChem.MMFFOptimizeMolecule(mol_h, confId=0)
     mol_noh = Chem.RemoveAllHs(mol_h)
     return mol_noh if mol_noh.GetNumConformers() > 0 else None
 
