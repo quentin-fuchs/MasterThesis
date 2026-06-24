@@ -28,6 +28,12 @@ TARP:
 I/O:
     load_ligand_sdf           — load heavy-atom RDKit mol + coordinates from SDF
     load_protein_ca_coords    — load Cα coordinates from a PDB file
+
+Style:
+    style.setup               — apply thesis mplstyle + Okabe-Ito color cycle
+    style.C                   — Okabe-Ito color dict (green/orange/blue/purple/…)
+    style.FS                  — font-size dict (label/tick/ann/letter/legend)
+    style.subfig_label        — add bold (A)/(B) letter to an axes
 """
 
 from molcalib.distances import (
@@ -54,6 +60,7 @@ from molcalib.io import (
     load_ligand_sdf,
     load_protein_ca_coords,
 )
+from molcalib import style
 
 __all__ = [
     "compute_rmsd_symmetry",
@@ -70,4 +77,5 @@ __all__ = [
     "plot_ecp",
     "load_ligand_sdf",
     "load_protein_ca_coords",
+    "style",
 ]
