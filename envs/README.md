@@ -1,7 +1,7 @@
 ## DiffDock inference
-
+From the repository root
 ```bash
-conda env create -f /home/qf226/MProject/thesis/diffdock/environment.yml -n diffdock_inference
+conda env create -f /diffdock/environment.yml -n diffdock_inference
 conda run -n diffdock_inference pip install "openfold @ git+https://github.com/aqlaboratory/openfold.git@4b41059694619831a7db195b7e0988fc4ff3a307"
 ```
 
@@ -14,7 +14,7 @@ CSD3 has glibc 2.28 / GLIBCXX 3.4.25. Use Python 3.10 and cu118; newer builds ne
 ```bash
 conda create -y -n sigmadock_inference python=3.10
 conda activate sigmadock_inference
-cd /home/qf226/MProject/thesis/sigmadock
+cd sigmadock
 bash install.sh cu118 train,test
 ```
 
@@ -27,11 +27,7 @@ gnina is **not on conda-forge** (the package does not exist there). The GitHub b
 Use the v1.1 binary (Dec 2023) — the last build compatible with glibc 2.28:
 
 ```bash
-# If already available on RDS (fastest):
-cp /rds/user/qf226/hpc-work/.conda/envs/sigmadock/bin/gnina \
-   "${CONDA_PREFIX}/bin/gnina"
-
-# Or download from GitHub releases:
+# Download from GitHub releases:
 wget https://github.com/gnina/gnina/releases/download/v1.1/gnina \
      -O "${CONDA_PREFIX}/bin/gnina"
 chmod +x "${CONDA_PREFIX}/bin/gnina"
