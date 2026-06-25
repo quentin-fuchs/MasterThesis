@@ -13,7 +13,7 @@ no_final_step_noise: true
 no_model: false
 no_random: false
 no_random_pocket: false
-ode: true
+ode: false
 old_filtering_model: true
 old_score_model: false
 resample_rdkit: false

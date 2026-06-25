@@ -30,6 +30,7 @@ import matplotlib.pyplot as plt
 
 from molcalib.distances import compute_rmsd_symmetry, compute_centroid_distance
 from molcalib.prior import generate_reference_coords
+from molcalib.style import FS
 
 warnings.filterwarnings("ignore")
 
@@ -165,14 +166,9 @@ def plot_ecp(ecp, alpha, ax=None, label=None, color=None, bootstrap_ecps=None,
         ax.fill_between(alpha, lo, hi, color=c, alpha=0.2)
 
     ax.plot([0, 1], [0, 1], "k--", lw=1, label="Perfect calibration")
-    ax.set_xlabel("Credibility level α", fontsize=12)
-    ax.set_ylabel("Expected coverage probability", fontsize=12)
+    ax.set_xlabel("Credibility level α", fontsize=FS["label"])
+    ax.set_ylabel("Expected coverage probability", fontsize=FS["label"])
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
-    ax.legend(fontsize=10)
     ax.set_aspect("equal")
-    ax.text(0.05, 0.92, "Over-dispersed ↑", transform=ax.transAxes,
-            fontsize=8, color="grey")
-    ax.text(0.55, 0.05, "Mode-collapsed ↓", transform=ax.transAxes,
-            fontsize=8, color="grey")
     return ax

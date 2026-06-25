@@ -168,6 +168,33 @@ def _mira_euclidean(crystal, samples, num_runs, device, metric="euclidean"):
     return float(score[0].cpu())
 
 
+def bootstrap_mira(scores, n_bootstrap=500, rng=None):
+    """Bootstrap MIRA mean and std by resampling complexes.
+
+    Matches the paper's approach (Sharief et al. 2026): resample the fiducial
+    set with replacement, recompute the aggregate Mira score, and report the
+    std of the bootstrap means as the uncertainty on the mean.
+
+    Args:
+        scores: (n_complexes,) array of per-complex MIRA scores.
+        n_bootstrap: number of bootstrap replicates.
+        rng: numpy Generator.
+
+    Returns:
+        dict with 'n', 'mean', 'std', 'boot_means'.
+    """
+    if rng is None:
+        rng = np.random.default_rng(42)
+    scores = np.asarray(scores, dtype=float)
+    scores = scores[np.isfinite(scores)]
+    n = len(scores)
+    boot = np.array([
+        rng.choice(scores, size=n, replace=True).mean()
+        for _ in range(n_bootstrap)
+    ])
+    return {"n": n, "mean": float(scores.mean()), "std": float(np.std(boot, ddof=1)), "boot_means": boot}
+
+
 def bootstrap_mira_groups(scores, group_labels, group_names, n_bootstrap=500, rng=None):
     """Bootstrap per-group MIRA mean and 90% CI by resampling complexes.
 
