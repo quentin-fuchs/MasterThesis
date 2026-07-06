@@ -1,7 +1,7 @@
 ## DiffDock inference
 From the repository root
 ```bash
-conda env create -f /diffdock/environment.yml -n diffdock_inference
+conda env create -f diffdock/environment.yml -n diffdock_inference
 conda run -n diffdock_inference pip install "openfold @ git+https://github.com/aqlaboratory/openfold.git@4b41059694619831a7db195b7e0988fc4ff3a307"
 ```
 
