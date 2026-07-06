@@ -28,48 +28,47 @@ The package was developed as part of an MPhil thesis evaluating the calibration 
 
 ### Calibration in molecular docking
 
-A docking model is **calibrated** if its predicted distribution over poses matches the true conditional distribution given the protein-ligand complex. For diffusion-based models like DiffDock and SigmaDock, which sample a posterior over poses, calibration means the spread and location of S predicted samples faithfully represent the model's uncertainty — not just that one of them is accurate.
+A docking model is **calibrated** if its predicted distribution over poses matches the true conditional distribution given the protein-ligand complex. For diffusion-based models like DiffDock and SigmaDock, which sample a posterior over poses, calibration means the spread and location of $S$ predicted samples faithfully represent the model's uncertainty — not just that one of them is accurate.
 
-Traditional accuracy metrics (e.g. top-1 RMSD < 2 Å) only evaluate the single best prediction and say nothing about the rest of the distribution. The calibration metrics in molcalib evaluate the full S-sample distribution.
+Traditional accuracy metrics (e.g. top-1 RMSD < 2 Å) only evaluate the single best prediction and say nothing about the rest of the distribution. The calibration metrics in molcalib evaluate the full $S$-sample distribution.
 
 ### The reference pose prior
 
-Both TARP and MIRA require a reference distribution `p(c | protein)` over pose space that depends only on the protein, not on the crystal pose. Using a protein-dependent prior — rather than a fixed uniform box — makes the test sensitive to uninformative posteriors: a model that always returns prior samples is detected as uncalibrated.
+Both TARP and MIRA require a reference distribution $p(c \mid \text{protein})$ over pose space that depends only on the protein, not on the crystal pose. Using a protein-dependent prior — rather than a fixed uniform box — makes the test sensitive to uninformative posteriors: a model that always returns prior samples is detected as uncalibrated.
 
-molcalib uses a prior that mirrors DiffDock's forward diffusion process at `t = 1` (`randomize_position` in DiffDock's `utils/sampling.py`):
+molcalib uses a prior that mirrors DiffDock's forward diffusion process at $t = 1$ (`randomize_position` in DiffDock's `utils/sampling.py`):
 
-- **Torsion angles** — uniform on [−π, π] applied to an ETKDGv2 conformer of the ligand
-- **Global rotation** — uniform on SO(3) via a random unit quaternion
-- **Translation** — centroid drawn from a Gaussian centred at the protein Cα centre-of-mass:
+- **Torsion angles** — uniform on $[-\pi, \pi]$ applied to an ETKDGv2 conformer of the ligand
+- **Global rotation** — uniform on $\mathrm{SO}(3)$ via a random unit quaternion
+- **Translation** — centroid drawn from a Gaussian centred at the protein $C_\alpha$ centre-of-mass:
 
-  ```
-  centroid ~ N(Cα_COM,  σ² I)
-  where  σ = std(‖Cα − Cα_COM‖) × 1.4602 / 1.73
-  ```
+```math
+\text{centroid} \sim \mathcal{N}\!\left(\bar{c}_\alpha,\; \sigma^2 I\right), \qquad \sigma = \frac{\sigma_{C\alpha} \times 1.4602}{1.73}
+```
 
-  The constant 1.4602 is DiffDock's `initial_noise_std_proportion` from `default_inference_args.yaml`.
+  where $\sigma_{C\alpha} = \mathrm{std}(\|C\alpha_i - \bar{c}_\alpha\|)$. The constant 1.4602 is DiffDock's `initial_noise_std_proportion` from `default_inference_args.yaml`.
 
 ### TARP
 
-*Lemos et al. 2023 — arXiv:2302.03026*
+*Lemos et al. 2023, in ICML — arXiv:2302.03026*
 
-For a complex with crystal pose `y*` and S posterior samples `{y₁, …, yₛ}`, TARP draws K random reference poses `{c₁, …, c_K}` from the prior and computes a **coverage fraction** for each:
+For a complex with crystal pose $y^*$ and $S$ posterior samples $\{y_1, \ldots, y_S\}$, TARP draws $K$ random reference poses $\{c_1, \ldots, c_K\}$ from the prior and computes a **coverage fraction** for each:
 
+```math
+f_k = \frac{1}{S} \sum_{j=1}^{S} \mathbf{1}\!\left[ d(c_k,\, y_j) < d(c_k,\, y^*) \right]
 ```
-f_k = (1/S) Σⱼ  1[ d(cₖ, yⱼ) < d(cₖ, y*) ]
-```
 
-where `d` is either symmetry-corrected RMSD or centroid distance.
+where $d$ is either symmetry-corrected RMSD or centroid distance.
 
-`f_k` is the fraction of predicted samples that fall closer to the reference than the crystal pose does. Under perfect calibration, `f_k ~ Uniform[0, 1]`.
+$f_k$ is the fraction of predicted samples that fall closer to the reference than the crystal pose does. Under perfect calibration, $f_k \sim \mathrm{Uniform}[0, 1]$.
 
 The **Expected Coverage Probability (ECP)** curve pools fractions across all complexes and reference draws:
 
-```
-ECP(α)  =  fraction of all f values ≤ α
+```math
+\mathrm{ECP}(\alpha) = \Pr(f \leq \alpha)
 ```
 
-Under perfect calibration, `ECP(α) = α` (the diagonal). Deviations indicate:
+estimated empirically as the fraction of all $f$ values $\leq \alpha$. Under perfect calibration, $\mathrm{ECP}(\alpha) = \alpha$ (the diagonal). Deviations indicate:
 
 | ECP relative to diagonal | Interpretation |
 |---|---|
@@ -77,35 +76,43 @@ Under perfect calibration, `ECP(α) = α` (the diagonal). Deviations indicate:
 | Above diagonal | Over-dispersed: samples spread too widely; crystal often the furthest point |
 | On diagonal | Well-calibrated |
 
-The area between the ECP curve and the diagonal (ATC score = `∫ (ECP − α) dα`) provides a signed scalar summary: negative = over-confident, positive = conservative, zero = calibrated.
+The signed area between the ECP and the diagonal,
+
+```math
+\mathrm{ATC} = \int_0^1 \bigl(\mathrm{ECP}(\alpha) - \alpha\bigr)\, d\alpha
+```
+
+summarises calibration as a scalar: $\mathrm{ATC} < 0$ means over-confident, $\mathrm{ATC} > 0$ means conservative, $\mathrm{ATC} = 0$ means calibrated.
 
 ### MIRA
 
-*Sharief et al. 2026 — arXiv:2605.02014*
+*Sharief et al. 2026, in ICML — arXiv:2605.02014*
 
-MIRA reduces calibration to a scalar score using random balls. For each of `T` Monte Carlo runs:
+MIRA reduces calibration to a scalar score using random balls. For each of $T$ Monte Carlo runs:
 
-1. Draw a center `c` from the prior
-2. Pick a random reference sample `yᵣ` from the S posterior samples; set ball radius `r = d(c, yᵣ)`
-3. Count `n⁺ = #{j ≠ r : d(c, yⱼ) < r}` (samples inside the ball, excluding `yᵣ`; `N = S − 1` total counted)
-4. Set `k = 1` if the crystal pose is inside the ball (`d(c, y*) ≤ r`), else `k = 0`
+1. Draw a center $c$ from the prior
+2. Pick a random reference sample $y_r$ from the $S$ posterior samples; set ball radius $r = d(c, y_r)$
+3. Count $n^+ = \#\{j \neq r : d(c, y_j) < r\}$ (samples inside the ball, excluding $y_r$; $N = S - 1$ total counted)
+4. Set $k = 1$ if the crystal pose is inside the ball ($d(c, y^*) \leq r$), else $k = 0$
 5. Compute the Laplace-smoothed, normalised calibration estimate:
 
-   ```
-   p_in  = (n⁺ + 1) / (N + 2)
-   p_out = (N − n⁺ + 1) / (N + 2)
-   calib = (p_in · k  +  p_out · (1 − k))  /  ((N + 1) / (N + 2))
-   ```
+```math
+p_\text{in} = \frac{n^+ + 1}{N + 2}, \qquad p_\text{out} = \frac{N - n^+ + 1}{N + 2}
+```
 
-The MIRA score is `mean(calib)` over all T runs.
+```math
+\text{calib} = \frac{p_\text{in} \cdot k \;+\; p_\text{out} \cdot (1 - k)}{(N + 1)\,/\,(N + 2)}
+```
+
+The MIRA score is $\overline{\text{calib}}$ averaged over all $T$ runs.
 
 **Null reference.** Under perfect calibration the expected score is:
 
-```
-null(S)  =  (2/3) · (S + 1) / S
+```math
+\text{null}(S) = \frac{2}{3} \cdot \frac{S + 1}{S}
 ```
 
-For S = 40 samples: `null ≈ 0.683`. The null is derived from `E[calib] = 2/3` under calibration, normalised by the maximum achievable value `(N+1)/(N+2)`.
+For $S = 40$ samples: $\text{null} \approx 0.683$. The null is derived from $\mathbb{E}[\text{calib}] = 2/3$ under calibration, normalised by the maximum achievable value $(N+1)/(N+2)$.
 
 | MIRA relative to null | Interpretation |
 |---|---|
@@ -156,7 +163,7 @@ from molcalib import (
 
 ### molcalib.prior
 
-Generates random reference poses from the prior distribution `p(c | protein)`. Call `prepare_reference_template` once per complex and then `generate_reference_coords` for each draw.
+Generates random reference poses from the prior distribution $p(c \mid \text{protein})$. Call `prepare_reference_template` once per complex and then `generate_reference_coords` for each draw.
 
 ---
 
@@ -180,12 +187,12 @@ Generates an ETKDGv2 conformer of the ligand and identifies rotatable bonds usin
 
 Draw one reference pose from the prior. Cheap to call repeatedly since the ETKDG conformer is pre-computed by `prepare_reference_template`.
 
-Steps (mirroring DiffDock's `randomize_position` at `t = 1`):
+Steps (mirroring DiffDock's `randomize_position` at $t = 1$):
 1. Copy the ETKDG template conformer
-2. Randomise all rotatable torsion angles uniformly in [−π, π]
+2. Randomise all rotatable torsion angles uniformly in $[-\pi, \pi]$
 3. Centre the molecule at the origin
-4. Apply a uniformly random SO(3) rotation (sampled via unit quaternion)
-5. Translate centroid to `N(Cα_COM, σ² I)` where `σ = std_Cα × 1.4602 / 1.73`
+4. Apply a uniformly random $\mathrm{SO}(3)$ rotation (sampled via unit quaternion)
+5. Translate centroid to $\mathcal{N}(C\alpha_\text{COM},\, \sigma^2 I)$ where $\sigma = \sigma_{C\alpha} \times 1.4602 \,/\, 1.73$
 
 **Args**
 
@@ -193,7 +200,7 @@ Steps (mirroring DiffDock's `randomize_position` at `t = 1`):
 |---|---|---|
 | `template_mol` | RDKit `Mol` | Template with one ETKDG conformer, from `prepare_reference_template` |
 | `rot_bonds` | list of tuples | `(n0, a, b, n1)` tuples from `prepare_reference_template` |
-| `ca_coords` | `(N_res, 3)` ndarray | Protein Cα coordinates |
+| `ca_coords` | `(N_res, 3)` ndarray | Protein $C_\alpha$ coordinates |
 | `rng` | `numpy.random.Generator` | Random number generator |
 
 **Returns** `(N_atoms, 3)` numpy array — coordinates of the reference pose.
@@ -267,8 +274,8 @@ Implements the MIRA calibration score (Sharief et al. 2026).
 
 Expected MIRA score under perfect calibration for `S` posterior samples.
 
-```
-null(S) = (2/3) · (S + 1) / S
+```math
+\text{null}(S) = \frac{2}{3} \cdot \frac{S + 1}{S}
 ```
 
 **Args**
@@ -277,7 +284,7 @@ null(S) = (2/3) · (S + 1) / S
 |---|---|---|
 | `S` | int | Number of posterior samples per complex |
 
-**Returns** Float. For S = 40: ≈ 0.6833.
+**Returns** Float. For $S = 40$: $\approx 0.6833$.
 
 ---
 
@@ -291,10 +298,10 @@ MIRA score for a single complex using symmetry-corrected RMSD. See [the MIRA sec
 |---|---|---|
 | `crystal_mol` | RDKit `Mol` | Heavy-atom molecule (defines atom graph for symRMSD) |
 | `crystal_coords` | `(N_atoms, 3)` ndarray | Crystal pose |
-| `sample_coords` | list of `(N_atoms, 3)` ndarrays | S predicted poses |
+| `sample_coords` | list of `(N_atoms, 3)` ndarrays | $S$ predicted poses |
 | `template_mol` | RDKit `Mol` | ETKDG template from `prepare_reference_template` |
 | `rot_bonds` | list of tuples | Rotatable bonds from `prepare_reference_template` |
-| `ca_coords` | `(N_res, 3)` ndarray | Protein Cα coordinates |
+| `ca_coords` | `(N_res, 3)` ndarray | Protein $C_\alpha$ coordinates |
 | `num_runs` | int | Monte Carlo center draws (default 20) |
 | `rng` | `numpy.random.Generator` | Created fresh if `None` |
 | `timeout` | float | Per-call symRMSD timeout in seconds (default 4) |
@@ -339,29 +346,29 @@ Bootstrap per-group MIRA mean and 90% CI by resampling complexes within each gro
 
 ### molcalib.tarp
 
-Implements the TARP coverage test and ECP diagnostics (Lemos & Coogan et al. 2023).
+Implements the TARP coverage test and ECP diagnostics (Lemos et al. 2023).
 
 ---
 
 #### `tarp_fractions(crystal_mol, crystal_coords, template_mol, rot_bonds, sample_coords, ca_coords, K, rng, mode='rmsd')`
 
-Compute K TARP coverage fractions for a single complex. See [the TARP section](#tarp) for the full algorithm.
+Compute $K$ TARP coverage fractions for a single complex. See [the TARP section](#tarp) for the full algorithm.
 
 **Args**
 
 | Name | Type | Description |
 |---|---|---|
 | `crystal_mol` | RDKit `Mol` | Heavy-atom molecule (defines atom graph for RMSD) |
-| `crystal_coords` | `(N_atoms, 3)` ndarray | Crystal pose |
+| `crystal_coords` | `(N_atoms, 3)` ndarray | Crystal pose $y^*$ |
 | `template_mol` | RDKit `Mol` | ETKDG template from `prepare_reference_template` |
 | `rot_bonds` | list of tuples | Rotatable bonds from `prepare_reference_template` |
-| `sample_coords` | list of `(N_atoms, 3)` ndarrays | S predicted poses |
-| `ca_coords` | `(N_res, 3)` ndarray | Protein Cα coordinates |
+| `sample_coords` | list of `(N_atoms, 3)` ndarrays | $S$ predicted poses |
+| `ca_coords` | `(N_res, 3)` ndarray | Protein $C_\alpha$ coordinates |
 | `K` | int | Number of random reference draws |
 | `rng` | `numpy.random.Generator` | |
 | `mode` | str | `'rmsd'` (symmetry-corrected, default) or `'centroid'` |
 
-**Returns** `(≤K,)` numpy array with values in [0, 1]. May be shorter than K if any reference distances are non-finite.
+**Returns** Array of shape $(\leq K,)$ with values in $[0, 1]$. May be shorter than $K$ if any reference distances are non-finite.
 
 ---
 
@@ -369,14 +376,14 @@ Compute K TARP coverage fractions for a single complex. See [the TARP section](#
 
 Compute the Expected Coverage Probability (ECP) curve from a matrix of TARP fractions.
 
-All fractions across complexes and reference draws are pooled into a single empirical CDF: `ECP(α) = fraction of f values ≤ α`. Under perfect calibration, `ECP(α) = α`.
+All fractions across complexes and reference draws are pooled and the empirical CDF is computed: $\mathrm{ECP}(\alpha) = \Pr(f \leq \alpha)$. Under perfect calibration, $\mathrm{ECP}(\alpha) = \alpha$.
 
 **Args**
 
 | Name | Type | Description |
 |---|---|---|
 | `f_matrix` | `(n_complexes, K)` ndarray | TARP fractions, or a flat 1-D array |
-| `n_bins` | int | Number of α values (default 50) |
+| `n_bins` | int | Number of $\alpha$ values (default 50) |
 
 **Returns** `(ecp, alpha)` — two `(n_bins,)` numpy arrays; `alpha = linspace(0, 1, n_bins)`.
 
@@ -391,7 +398,7 @@ Bootstrap confidence bands for the ECP by resampling **rows** of `f_matrix` with
 | Name | Type | Description |
 |---|---|---|
 | `f_matrix` | `(n_complexes, K)` ndarray | TARP fractions |
-| `n_bins` | int | Number of α values (default 50) |
+| `n_bins` | int | Number of $\alpha$ values (default 50) |
 | `n_bootstrap` | int | Number of replicates (default 500) |
 | `rng` | `numpy.random.Generator` | |
 
@@ -408,7 +415,7 @@ Plot an ECP curve with the perfect-calibration diagonal.
 | Name | Type | Description |
 |---|---|---|
 | `ecp` | `(n_bins,)` ndarray | ECP values |
-| `alpha` | `(n_bins,)` ndarray | Credibility levels |
+| `alpha` | `(n_bins,)` ndarray | Credibility levels $\alpha$ |
 | `ax` | `matplotlib.axes.Axes` | Target axes; a new figure is created if `None` |
 | `label` | str | Legend label |
 | `color` | str | Line colour |
@@ -444,7 +451,7 @@ Load a heavy-atom RDKit `Mol` and all conformer coordinates from an SDF or mol2 
 
 #### `load_protein_ca_coords(protein_pdb_path)`
 
-Load Cα coordinates from a PDB file via ProDy.
+Load $C_\alpha$ coordinates from a PDB file via ProDy.
 
 **Args**
 
@@ -452,7 +459,7 @@ Load Cα coordinates from a PDB file via ProDy.
 |---|---|---|
 | `protein_pdb_path` | str or Path | Path to `.pdb` file |
 
-**Returns** `(N_residues, 3)` numpy array.
+**Returns** `(N_\text{residues}, 3)$ numpy array.
 
 **Raises** `FileNotFoundError` if the file is missing.
 
