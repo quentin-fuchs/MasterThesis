@@ -47,6 +47,8 @@ env/
 *.pdf
 !figures/
 !figures/**
+!report/
+!report/**
 
 # DiffDock workdir (model weights, configs downloaded at first run)
 diffdock/workdir
