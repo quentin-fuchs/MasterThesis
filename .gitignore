@@ -39,12 +39,14 @@ env/
 *.pdb
 *.cif
 
-# Images / figures
+# Images / figures (ignored globally; figures/ output dir is explicitly tracked)
 *.png
 *.jpg
 *.jpeg
 *.svg
 *.pdf
+!figures/
+!figures/**
 
 # DiffDock workdir (model weights, configs downloaded at first run)
 diffdock/workdir
