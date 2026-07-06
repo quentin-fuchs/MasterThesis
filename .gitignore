@@ -49,8 +49,7 @@ env/
 # DiffDock workdir (model weights, configs downloaded at first run)
 diffdock/workdir
 
-# SLURM scripts (keep in ~/slurm/ only; curate manually what goes in the repo)
-eval_diffdock/slurm/
+# SLURM scripts — top-level slurm/ is tracked; ignore any nested slurm dirs
 eval_sigmadock/slurm/
 
 # Misc
