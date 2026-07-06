@@ -1,0 +1,47 @@
+name: diffdock
+channels:
+  - pyg
+  - nvidia
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9.18
+  - pip
+  - python-devtools
+  # Need older setuptools for openfold
+  - setuptools=69.5.1
+  # ProDy needs to be installed with conda
+  - prody==2.2.0
+  - scipy==1.12.0
+  # On CSD3 (RHEL8), system libstdc++ lacks GLIBCXX_3.4.29; prepend conda lib at runtime:
+  #   export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+  # All pip dependencies in a single block (YAML merges duplicate keys, so only one - pip: is allowed)
+  - pip:
+    - --extra-index-url https://download.pytorch.org/whl/cu117
+    - --find-links https://pytorch-geometric.com/whl/torch-1.13.1+cu117.html
+    - torch==1.13.1+cu117
+    - dllogger @ git+https://github.com/NVIDIA/dllogger.git
+    - e3nn==0.5.1
+    - fair-esm[esmfold]==2.0.0
+    - networkx==2.8.4
+    - pandas==1.5.1
+    - pybind11==2.11.1
+    - pytorch-lightning==1.9.5
+    - rdkit==2022.03.3
+    - scikit-learn==1.1.0
+    - torch-cluster==1.6.0+pt113cu117
+    - torch-geometric==2.2.0
+    - torch-scatter==2.1.0+pt113cu117
+    - torch-sparse==0.6.16+pt113cu117
+    - torch-spline-conv==1.2.1+pt113cu117
+    - torchmetrics==0.11.0
+    # openfold requires torch at setup time — install separately after env creation:
+    #   pip install "openfold @ git+https://github.com/aqlaboratory/openfold.git@4b41059694619831a7db195b7e0988fc4ff3a307"
+    - gradio==3.50.*
+    - requests
+
+    # Experiment tracking (needed in evaluate.py and training)
+    - wandb==0.26.1
+
+    

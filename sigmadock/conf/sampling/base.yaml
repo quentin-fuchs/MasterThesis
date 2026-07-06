@@ -1,0 +1,85 @@
+# @package _global_
+# Nests this group at the config root so ``ckpt=``, ``data_dir=``, ``experiment=`` CLI overrides apply.
+
+defaults:
+  - _self_
+
+# Short CLI (optional): ckpt=... data_dir=... experiment=posebusters
+ckpt: null
+data_dir: null
+experiment: null
+
+# Named benchmark: conf/experiments/<name>.yaml. Default null = custom inference (see inference:).
+experiments:
+  name: null
+  sdf_regex: ".*ligand.sdf$"
+  # ref_sdf_regex: "reference\\.sdf"
+
+# When experiments.name is null: inference_datafront CSV or explicit paths (no folder scan).
+inference:
+  inference_datafront: null  # CSV: PDB, SDF columns; optional REF_SDF (or REFERENCE_SDF, REF). Paths relative to CSV dir.
+  ligand_sdf: null      # with protein_pdb: single complex (reference_sdf optional)
+  protein_pdb: null
+  reference_sdf: null
+
+# GLOBAL SETTINGS
+seed: 0
+# Custom inference: first path segment under results/ (named experiment uses experiments.name instead).
+run_tag: sampling
+output_dir: null  # output directory for sampling results (will be created if it doesn't exist)
+# Prefer num_seeds=1 and multiple runs with different `seed` (e.g. SLURM --array) for independent draws and full reproducibility.
+num_seeds: 1
+
+# Hydra settings (disable outputs/...)
+hydra:
+  run:
+    dir: .               # stay in current working dir
+  output_subdir: null    # don't create .hydra with config copies
+
+hardware:
+  devices: [0] #  Can use multiple devices by setting to [0, 1, 2, 3] etc. or auto for all available devices.
+  accelerator: auto
+  strategy: auto
+  precision: 32  # precision to use (32, 16, or bf16)
+  deterministic: true  # whether to use deterministic training/inference for reproducibility
+  cuda_precision: high
+
+graph:
+  fragmentation_strategy: canonical  # fragmentation strategy for ligands (canonical, random, smallest)
+  sample_conformer: true  # whether to fragments from sample conformers at inference or use bound pose fragments
+  alignment_tries: 0  # number of tries to align the ligand conformer to the bound pose, only if sample_conformers is false
+  pocket_distance_cutoff: 5.0  # distance cutoff for defining pocket residues
+  pocket_com_noise: 0.25
+  pocket_distance_noise: 0.5
+  pocket_coordinate_jitter: 0.02
+  random_rotation: false  # whether to apply a random rotation to the complex
+  use_esm_embeddings: false
+  ignore_conjugated_torsion: false # whether to ignore conjugated bonds when defining rotatable bonds
+  ignore_triangulation: false # whether to ignore triangulation when defining rotatable bonds
+
+diffusion:
+  num_steps: 25 # number of diffusion steps
+  t_min: 0.005  # minimum noise level (see Karras et al. 2022)
+  rho: 3.0 # controls the spacing of the noise schedule (see Karras et al. 2022)
+  noise_scale: 0.0  # scale of the noise to add at each step (0=no noise better fidelity, 1=full noise better diversity)
+  noise_decay: 2.0 # controls the decay of the noise schedule (annealed)
+  discretization: edm  # discretization method for noise schedule (power or edm)
+  solver: euler  # solver to use for reverse diffusion (euler or heun)
+  use_true_scores: false  # whether to use true scores (if available) instead of learned scores (for evaluation only)
+  verbose: false  # whether to print verbose output during sampling
+
+data:
+  batch_size: 32
+  num_workers: 4
+  data_dir: null   # or pass data_dir=... on CLI / set ckpt + experiment + paths in yaml
+  blacklist: null  # optional; posebusters whitelist when experiment=posebusters
+
+model:
+  model_id: null
+  ckpt_dir: null   # or pass ckpt=... on CLI
+  cached_s03_dir: cache
+  use_ema: true  # whether to use EMA model for sampling
+
+postprocessing:
+  scoring: vinardo  # "vina" or "vinardo" to compute gnina scores. Null to ignore.
+  bust_config: redock  # redock | redock-fast | null (off). Rows with inference.reference_sdf / REF_SDF use ``dock`` automatically.
