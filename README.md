@@ -253,6 +253,12 @@ Claude Code assisted in understanding the existing codebase and in writing funct
 
 ---
 
+## Authors and Acknowledgment
+
+This project was developed by [Quentin Fuchs](https://www.linkedin.com/in/quentin-fuchs-444bb420b/) at the University of Cambridge as part of an MPhil in Data Intensive Science, 26th June 2026.
+
+---
+
 ## molcalib
 
 `molcalib` is the core contribution of this project — a standalone Python package implementing TARP and MIRA calibration diagnostics for molecular docking.
