@@ -246,6 +246,13 @@ The `eval_sigmadock/scripts/` directory mirrors `eval_diffdock/scripts/` with Si
 
 ---
 
+## Generative AI Declaration
+
+In preparation for this report, I adhered to the coursewide AI policy.
+Claude Code assisted in understanding the existing codebase and in writing functions and shell scripts. Gemini and Claude were further used for drafting and proofreading of the report.
+
+---
+
 ## molcalib
 
 `molcalib` is the core contribution of this project — a standalone Python package implementing TARP and MIRA calibration diagnostics for molecular docking.
